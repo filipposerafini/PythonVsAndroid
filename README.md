@@ -3,4 +3,5 @@
 
 ## Install
 The game requires only **_pygame_**.
+
 To install run `pip install -U pygame`
