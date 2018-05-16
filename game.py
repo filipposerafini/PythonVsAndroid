@@ -1,4 +1,3 @@
-import time
 import random
 import pygame
 from pygame.locals import *
@@ -8,7 +7,7 @@ class Apple:
     def __init__(self, x, y):
         self.x = x
         self.y = y
-        self.image = pygame.image.load('apple.png').convert()
+        self.image = pygame.image.load('resources/apple.png').convert()
 
     def draw(self, surface, cell_size):
         surface.blit(self.image, (self.x * cell_size, self.y * cell_size))
@@ -18,6 +17,7 @@ class Snake:
     def __init__(self, x, y, length, path):
         self.x = []
         self.y = []
+        self.score = 0
         self.direction = 0 if x < 32 else 2
         self.length = length
         self.image = pygame.image.load(path).convert()
@@ -42,6 +42,12 @@ class Snake:
         elif self.direction == 3:
             self.y[0] -= 1
 
+    def addPiece(self):
+        self.x.append(self.x[self.length - 1])
+        self.y.append(self.y[self.length - 1])
+        self.length += 1
+        self.score += 10
+
     def draw(self, surface, cell_size):
         for i in range(0, self.length):
             surface.blit(self.image, (self.x[i]*cell_size, self.y[i]*cell_size))
@@ -54,9 +60,7 @@ def isCollision(x1, y1, x2, y2):
 
 def eatApple(snake, apple):
     if isCollision(snake.x[0], snake.y[0], apple.x, apple.y):
-        snake.x.append(snake.x[snake.length - 1])
-        snake.y.append(snake.y[snake.length - 1])
-        snake.length += 1
+        snake.addPiece()
         return True
     return False
 
@@ -74,74 +78,103 @@ def hitBorder(snake):
     else:
         return False
 
-
+def write(screen, text, dimension, color, position):
+    font = pygame.font.Font('resources/font.otf', dimension)
+    surface = font.render(text, True, color)
+    rect = surface.get_rect()
+    rect.center = position
+    screen.blit(surface, rect)
 
 # Variables
-width = 1280
-height = 960
+width = 1920
+height = 1080
 cell_size = 20
+clock = pygame.time.Clock()
 
 # Init
 pygame.init()
 pygame.display.set_caption('Python vs Viper')
-display = pygame.display.set_mode((width, height), pygame.HWSURFACE)
-viper = Snake(18, 10, 4, 'viper.png')
-python = Snake(46, 38, 4, 'python.png')
-apple = Apple(random.randint(0, width / cell_size - 1 ), random.randint(0, height / cell_size - 1))
+icon = pygame.image.load('resources/icon.png')
+pygame.display.set_icon(icon)
+screen = pygame.display.set_mode((width, height), pygame.HWSURFACE)
+
 running = True
+playing = True
+viper = Snake(18, 10, 6, 'resources/viper.png')
+python = Snake(46, 38, 6, 'resources/python.png')
+apple = Apple(random.randint(0, width / cell_size - 1 ), random.randint(0, height / cell_size - 1))
 
 # Loop
 while running:
-    pygame.event.pump()
-    keys = pygame.key.get_pressed()
-    if keys[K_RIGHT]:
-        viper.changeDirection(0)
-    elif keys[K_LEFT]:
-        viper.changeDirection(2)
-    elif keys[K_UP]:
-        viper.changeDirection(3)
-    elif keys[K_DOWN]:
-        viper.changeDirection(1)
-    if keys[K_d]:
-        python.changeDirection(0)
-    elif keys[K_a]:
-        python.changeDirection(2)
-    elif keys[K_w]:
-        python.changeDirection(3)
-    elif keys[K_s]:
-        python.changeDirection(1)
-    if keys[K_ESCAPE]:
-        running = False
 
-    # Move Snakes
-    viper.updatePosition()
-    python.updatePosition()
+    for event in pygame.event.get():
+        if event.type == QUIT:
+            running = False
+        elif event.type == KEYDOWN:
+            if event.key == K_RETURN:
+                playing = True
+                viper = Snake(18, 10, 6, 'resources/viper.png')
+                python = Snake(46, 38, 6, 'resources/python.png')
+                apple = Apple(random.randint(0, width / cell_size - 1 ), random.randint(0, height / cell_size - 1))
 
-    # Check Collisions
-    if hitSnake(viper, viper):
-        running = False
-    if hitSnake(python, python):
-        running = False
-    if hitSnake(viper, python):
-        running = False
-    if hitSnake(python, viper):
-        running = False
-    if hitBorder(viper):
-        running = False
-    if hitBorder(python):
-        running = False
-    if eatApple(viper, apple) or eatApple(python, apple):
-        apple = Apple(random.randint(0, width / cell_size - 1 ), random.randint(0, height / cell_size - 1))
+    while playing:
+        pygame.event.pump()
+        keys = pygame.key.get_pressed()
+        if keys[K_RIGHT]:
+            viper.changeDirection(0)
+        elif keys[K_LEFT]:
+            viper.changeDirection(2)
+        elif keys[K_UP]:
+            viper.changeDirection(3)
+        elif keys[K_DOWN]:
+            viper.changeDirection(1)
+        if keys[K_d]:
+            python.changeDirection(0)
+        elif keys[K_a]:
+            python.changeDirection(2)
+        elif keys[K_w]:
+            python.changeDirection(3)
+        elif keys[K_s]:
+            python.changeDirection(1)
+        if keys[K_ESCAPE]:
+            playing = False
+    
+        # Move Snakes
+        viper.updatePosition()
+        python.updatePosition()
+    
+        # Check Collisions
+        if hitSnake(viper, viper):
+            playing = False
+        if hitSnake(python, python):
+            playing = False
+        if hitSnake(viper, python):
+            playing = False
+        if hitSnake(python, viper):
+            playing = False
+        if hitBorder(viper):
+            playing = False
+        if hitBorder(python):
+            playing = False
+        if eatApple(viper, apple) or eatApple(python, apple):
+            apple = Apple(random.randint(0, width / cell_size - 1 ), random.randint(0, height / cell_size - 1))
+    
+        # Update Display
+        screen.fill((0, 0, 0))
+    
+        if playing:
+            viper.draw(screen, cell_size)
+            python.draw(screen, cell_size)
+            apple.draw(screen, cell_size)
+            write(screen, "Viper: " + str(viper.score), 120, (0, 255, 0), (200, 100))
+            write(screen, "Python: " + str(python.score), 120, (0, 0, 255), (1720, 100))
+        else:
+            write(screen, "Game Over!", 200, (255, 0, 0), (width / 2, height / 3))
+            write(screen, "Press Enter to restart the game", 80, (255, 0, 0), (width / 2, 2 * height / 3))
 
-    # Update Display
-    if running:
-        display.fill((0, 0, 0))
-        viper.draw(display, cell_size)
-        python.draw(display, cell_size)
-        apple.draw(display, cell_size)
         pygame.display.flip()
-
-    time.sleep(50.0 / 1000.0)
+        clock.tick(30)
 
 # Quit
 pygame.quit()
+
