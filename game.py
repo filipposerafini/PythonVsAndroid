@@ -174,14 +174,13 @@ def showGameOver(surface, width, height):
     pygame.display.flip()
     return restart, menu
 
-# Variables
-clock = pygame.time.Clock()
-cell_size = 22
-width = CELL_COUNT_X * cell_size
-height = CELL_COUNT_Y * cell_size
-
 # Init
 pygame.init()
+info = pygame.display.Info()
+cell_size = int(info.current_w / 150)
+width = CELL_COUNT_X * cell_size
+height = CELL_COUNT_Y * cell_size
+clock = pygame.time.Clock()
 pygame.display.set_caption('Python vs Viper')
 icon = pygame.image.load('resources/icon.png')
 pygame.display.set_icon(icon)
