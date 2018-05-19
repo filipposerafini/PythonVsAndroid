@@ -2,20 +2,26 @@ import random
 import pygame
 from pygame.locals import *
 
-# Constants
+## Constants
+# Colors
 WHITE = (255, 255, 255)
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)
 BLUE = (0, 0, 255)
 BLACK = (0, 0, 0)
+# Keyboard
 KEYS = {0 : [K_RIGHT, K_d],
         1 : [K_DOWN, K_s],
         2 : [K_LEFT, K_a],
         3 : [K_UP, K_w]}
+# Grid Size
 CELL_COUNT_X = 96
 CELL_COUNT_Y = 54
+# FPS
 EASY = 30
-HARD = 50
+HARD = 60
+# Animation
+ANIMATION_SPEED = 10
 
 class Apple:
 
@@ -78,9 +84,9 @@ class Snake:
         return False
     
     def hitBorder(self):
-        if self.x[0] < 0 or self.x[0] > CELL_COUNT_X:
+        if self.x[0] < 0 or self.x[0] >= CELL_COUNT_X:
             return True
-        elif self.y[0] < 0 or self.y[0] > CELL_COUNT_Y:
+        elif self.y[0] < 0 or self.y[0] >= CELL_COUNT_Y:
             return True
         else:
             return False
@@ -127,6 +133,15 @@ class Game:
         if len(self.snakes) == 2:
             display_text(surface, "Viper: " + str(self.snakes[1].score), height / 9, GREEN, (width / 1.13, height / 10))
 
+    def showGameOver(self, surface, width, height):
+        playSong('resources/game_over.wav')
+        surface.fill(BLACK)
+        display_text(surface, "Game Over!", height / 5, RED, (width / 2, height / 3))
+        restart = display_text(surface, "Press Enter to restart the game", height / 12, WHITE, (width / 2, 2 * height / 3))
+        menu = display_text(surface, "Press Esc to retrun the menu", height / 12, WHITE, (width / 2, 2 * height / 3 + height / 10))
+        pygame.display.flip()
+        return restart, menu
+
 def display_text(surface, text, dimension, color, position, *background):
     font = pygame.font.Font('resources/font.otf', int(dimension))
     text_surface = font.render(text, True, color, background)
@@ -149,30 +164,42 @@ def playSound(file):
     sound = pygame.mixer.Sound(file)
     sound.play()
 
-def showDifficulty(surface, width, height, is_easy):
-    easy = display_text(surface, " Easy ", height / 10, WHITE if is_easy else RED, (width / 3, 2.5 * height / 3), RED if is_easy else BLACK)
-    hard = display_text(surface, " Hard ", height / 10, WHITE if not is_easy else RED, (2 * width / 3, 2.5 * height / 3), RED if not is_easy else BLACK)
-    pygame.display.flip()
-    return easy, hard
+def difficultySettings(surface, width, height, easy):
+    easy_button = display_text(surface, " Easy ", height / 10, WHITE if easy else RED, (width / 3, 2 * height / 6), RED if easy else BLACK)
+    hard_button = display_text(surface, " Hard ", height / 10, WHITE if not easy else RED, (2 * width / 3, 2 * height / 6), RED if not easy else BLACK)
+    return easy_button, hard_button
 
-def showMenu(surface, width, height):
+def audioSettings(surface, width, height, sound, music):
+    sound_button = display_text(surface, " Sound ", height / 10, WHITE if sound else RED, (width / 3, 4 * height / 6), RED if sound else BLACK)
+    music_button = display_text(surface, " Music ", height / 10, WHITE if music else RED, (2 * width / 3, 4 * height / 6), RED if music else BLACK)
+    return sound_button, music_button
+
+def showSettings(width, height, easy, sound, music):
+    surface = pygame.Surface((width, height))
+    surface.fill(BLACK)
+    display_text(surface, "Difficulty:", height / 10, WHITE, (width / 2, height / 6))
+    easy_button, hard_button = difficultySettings(surface, width, height, easy)
+    sound_button, music_button = audioSettings(surface, width, height, sound, music)
+    display_text(surface, "Audio:", height / 10, WHITE, (width / 2, 3 * height / 6))
+    done_button = display_text(surface, " Done ", height / 10, BLACK, (width / 2, 5 * height / 6), WHITE)
+    return surface, easy_button, hard_button, sound_button, music_button, done_button
+
+def showMenu(width, height):
+    surface = pygame.Surface((width, height))
     surface.fill(BLACK)
     display_text(surface, "Python", height / 5, BLUE, (width / 3 + width / 64, height / 3))
     display_text(surface, "VS", height / 5, RED, (width / 2 + width / 64, height / 3))
     display_text(surface, "Viper", height / 5, GREEN, (2 * width / 3 - width / 64, height / 3))
-    single = display_text(surface, "Single Player", height / 10, WHITE, (width / 3, 2 * height / 3))
-    multi = display_text(surface, "Multi Player", height / 10, WHITE, (2 * width / 3, 2 * height / 3))
-    pygame.display.flip()
-    return single, multi
+    single_button = display_text(surface, "Single Player", height / 10, WHITE, (width / 3, 2 * height / 3))
+    multi_button = display_text(surface, "Multi Player", height / 10, WHITE, (2 * width / 3, 2 * height / 3))
+    settings_button = display_text(surface, " Settings ", height / 10, BLACK, (width / 2, 2.5 * height / 3), WHITE)
+    return surface, single_button, multi_button, settings_button
 
-def showGameOver(surface, width, height):
-    playSong('resources/game_over.wav')
-    surface.fill(BLACK)
-    display_text(surface, "Game Over!", height / 5, RED, (width / 2, height / 3))
-    restart = display_text(surface, "Press Enter to restart the game", height / 12, WHITE, (width / 2, 2 * height / 3))
-    menu = display_text(surface, "Press Esc to retrun the menu", height / 12, WHITE, (width / 2, 2 * height / 3 + height / 10))
-    pygame.display.flip()
-    return restart, menu
+def fadeBetweenSurfaces(surface1, surface2):
+    for i in range(0, 255, ANIMATION_SPEED):
+        surface2.set_alpha(i)
+        surface1.blit(surface2, (0,0))
+        pygame.display.flip()
 
 # Init
 pygame.init()
@@ -185,38 +212,69 @@ pygame.display.set_caption('Python vs Viper')
 icon = pygame.image.load('resources/icon.png')
 pygame.display.set_icon(icon)
 screen = pygame.display.set_mode((width, height), pygame.HWSURFACE)
+playSong('resources/intro.wav')
 running = True
 in_menu = True
-is_easy = True
+in_settings = False
+easy = True
+sound = True
+music = True
+
+menu, single_button, multi_button, settings_button = showMenu(width, height)
+settings, easy_button, hard_button, sound_button, music_button, done_button = showSettings(width, height, easy, sound, music)
 
 # Loop
 while running:
 
-    if in_menu:
-        single, multi = showMenu(screen, width, height)
-        while in_menu:
-            easy, hard = showDifficulty(screen, width, height, is_easy)
-            for event in pygame.event.get():
-                if event.type == QUIT:
-                    running = False
+    while in_menu:
+        menu, single_button, multi_button, settings_button = showMenu(width, height)
+        screen.blit(menu, (0,0))
+        pygame.display.flip()
+        for event in pygame.event.get():
+            if event.type == QUIT:
+                running = False
+                in_menu = False
+            elif event.type == KEYDOWN:
+                if event.key == K_RETURN:
+                    game = Game(1, EASY if easy else HARD)
                     in_menu = False
-                elif event.type == KEYDOWN:
-                    if event.key == K_RETURN:
-                        game = Game(1, EASY if is_easy else HARD)
-                        in_menu = False
-                elif event.type == MOUSEBUTTONDOWN:
-                    mouse_pos = event.pos
-                    if single.collidepoint(mouse_pos):
-                        game = Game(1, EASY if is_easy else HARD)
-                        in_menu = False
-                    elif multi.collidepoint(mouse_pos):
-                        game = Game(2, EASY if is_easy else HARD)
-                        in_menu = False
-                    elif easy.collidepoint(mouse_pos):
-                        is_easy = True
-                    elif hard.collidepoint(mouse_pos):
-                        is_easy = False
-    while game.running:
+            elif event.type == MOUSEBUTTONDOWN:
+                mouse_pos = event.pos
+                if single_button.collidepoint(mouse_pos):
+                    game = Game(1, EASY if easy else HARD)
+                    in_menu = False
+                elif multi_button.collidepoint(mouse_pos):
+                    game = Game(2, EASY if easy else HARD)
+                    in_menu = False
+                elif settings_button.collidepoint(mouse_pos):
+                    in_menu = False
+                    in_settings = True
+                    fadeBetweenSurfaces(screen, settings)
+    
+    while in_settings:
+        settings, easy_button, hard_button, sound_button, music_button, done_button = showSettings(width, height, easy, sound, music)
+        screen.blit(settings, (0,0))
+        pygame.display.flip()
+        for event in pygame.event.get():
+            if event.type == QUIT:
+                running = False
+                in_settings = False
+            elif event.type == MOUSEBUTTONDOWN:
+                mouse_pos = event.pos
+                if easy_button.collidepoint(mouse_pos):
+                    easy = True
+                elif hard_button.collidepoint(mouse_pos):
+                    easy = False
+                elif sound_button.collidepoint(mouse_pos):
+                    sound = not sound
+                elif music_button.collidepoint(mouse_pos):
+                    music = not music
+                elif done_button.collidepoint(mouse_pos):
+                    in_menu = True
+                    in_settings = False
+                    fadeBetweenSurfaces(screen, menu)
+
+    while 'game' in locals() and game.running:
         # Get Keyboard Input
         for event in pygame.event.get():
             if event.type == KEYDOWN:
@@ -224,9 +282,11 @@ while running:
                     for direction, keys in KEYS.items():
                         if event.key == keys[i]:
                             game.snakes[i].changeDirection(direction)
+                            break
                         elif event.key == K_ESCAPE:
                             game.running = False
                             in_menu = True
+                    continue
         # Move and Draw Snakes
         if game.updateSnakes():
             screen.fill(BLACK)
@@ -235,8 +295,8 @@ while running:
             pygame.display.flip()
             clock.tick(game.fps)
     else:
-        if running:
-            restart, menu = showGameOver(screen, width, height)
+        if running and not in_menu:
+            restart, menu = game.showGameOver(screen, width, height)
         while running and not in_menu and not game.running:
             for event in pygame.event.get():
                 if event.type == QUIT:
