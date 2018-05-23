@@ -2,24 +2,35 @@ import random
 import pygame
 from pygame.locals import *
 
+class AppleTypes:
+
+    NORMAL, GOLDEN, LIFE = range(3)
+
 class Apple:
 
-    def __init__(self, x, y):
+    def __init__(self, x, y, type):
         self.x = x
         self.y = y
+        self.type = type
+        self.expiration = 0
+        if not type == AppleTypes.NORMAL:
+            self.expiration = APPLE_EXPIRATION
 
     def draw(self, surface, cell_size):
         body = pygame.Surface((cell_size, cell_size))
-        body.fill(RED)
+        body.fill(APPLE_COLORS[self.type])
         surface.blit(body, (self.x * cell_size, self.y * cell_size))
 
 class Snake:
 
-    def __init__(self, x, y, length, color):
+    def __init__(self, x, y, length, lives, color):
         self.x = [x]
         self.y = [y]
         self.length = length
+        self.lives = lives
         self.color = color
+        self.expiration = 0
+        self.temp_color = color
         self.direction = 0 if self.x[0] < CELL_COUNT_X / 2 else 2
         self.score = 0
         for i in range(1, self.length):
@@ -37,7 +48,7 @@ class Snake:
             self.x[i] = self.x[i - 1]
             self.y[i] = self.y[i - 1]
         if self.direction == 0:
-            self.x[0] += 1 
+            self.x[0] += 1
         elif self.direction == 1:
             self.y[0] += 1
         elif self.direction == 2:
@@ -45,40 +56,67 @@ class Snake:
         elif self.direction == 3:
             self.y[0] -= 1
 
-    def _isCollision(self, x, y):
+    def isCollision(self, x, y):
         if self.x[0] == x and self.y[0] == y:
             return True
         else:
             return False
 
+    def changeColor(self, color):
+        self.temp_color = color
+        self.expiration = SNAKE_EXPIRATION
+
     def eatApple(self, apple):
-        if self._isCollision(apple.x, apple.y):
+        if self.isCollision(apple.x, apple.y):
             self.x.append(self.x[self.length - 1])
             self.y.append(self.y[self.length - 1])
             self.length += 1
-            self.score += 10
+            if apple.type == AppleTypes.NORMAL:
+                self.score += 10
+                SOUNDS['Apple'].play()
+            elif apple.type == AppleTypes.GOLDEN:
+                SOUNDS['Golden'].play()
+                self.score += 50
+            elif apple.type == AppleTypes.LIFE:
+                SOUNDS['Life'].play()
+                if self.lives < 5:
+                    self.lives += 1
+                else:
+                    self.score += 20
             return True
         return False
 
     def hitSnake(self, snake):
         for i in range(1 if self is snake else 0, snake.length):
-            if self._isCollision(snake.x[i], snake.y[i]):
+            if self.isCollision(snake.x[i], snake.y[i]) and not self.temp_color == RED:
+                self.score -= 50
+                self.lives -= 1
                 return True
         return False
 
     def hitBorder(self):
-        if self.x[0] < 0 or self.x[0] >= CELL_COUNT_X:
+        if self.x[0] < 0 or self.x[0] > CELL_COUNT_X - 1:
+            self.score -= 20
+            self.lives -= 1
+            self.x[0] = CELL_COUNT_X - 1 if self.x[0] < 0 else 0
             return True
-        elif self.y[0] < 0 or self.y[0] >= CELL_COUNT_Y:
+        elif self.y[0] < 0 or self.y[0] > CELL_COUNT_Y - 1:
+            self.score -= 20
+            self.lives -= 1
+            self.y[0] = CELL_COUNT_Y - 1 if self.y[0] < 0 else 0
             return True
         else:
             return False
 
     def draw(self, surface, cell_size):
         body = pygame.Surface((cell_size, cell_size))
-        body.fill(self.color)
+        body.fill(self.temp_color)
         for i in range(0, self.length):
             surface.blit(body, (self.x[i] * cell_size, self.y[i] * cell_size))
+        if self.expiration > 0:
+            self.expiration -= 1
+        else:
+            self.temp_color = self.color
 
 class Game:
 
@@ -86,27 +124,31 @@ class Game:
 
     def __init__(self, players, fps):
         self.fps = fps
-        self.apple = Apple(CELL_COUNT_X / 2, CELL_COUNT_Y / 2)
+        self.apple = Apple(CELL_COUNT_X / 2, CELL_COUNT_Y / 2, AppleTypes.NORMAL)
         self.snakes = []
-        self.snakes.append(Snake(random.randint(0, CELL_COUNT_X / 2), random.randint(0, CELL_COUNT_Y / 2), 10, BLUE))
+        self.snakes.append(Snake(random.randint(0, CELL_COUNT_X / 2), random.randint(0, CELL_COUNT_Y / 2), 15, 3, BLUE))
         if players == 2:
-            self.snakes.append(Snake(random.randint(CELL_COUNT_X / 2, CELL_COUNT_X - 1), random.randint(CELL_COUNT_Y / 2, CELL_COUNT_Y - 1), 10, GREEN))
+            self.snakes.append(Snake(random.randint(CELL_COUNT_X / 2, CELL_COUNT_X - 1), random.randint(CELL_COUNT_Y / 2, CELL_COUNT_Y - 1), 15, 3, GREEN))
 
     def restart(self):
         return Game(len(self.snakes), self.fps)
 
     def updateSnakes(self):
+        if self.apple.expiration == 0:
+            self.apple.type = AppleTypes.NORMAL
+        else:
+            self.apple.expiration -= 1
         for snake in self.snakes:
             snake.updatePosition()
-            if snake.hitSnake(snake):
-                SOUNDS['Snake'].play()
-                return False
-            if snake.hitBorder():
-                SOUNDS['Border'].play()
-                return False
+            if snake.hitSnake(snake) or snake.hitBorder():
+                SOUNDS['Hit'].play()
+                snake.changeColor(RED)
+                if snake.lives == 0:
+                    return False
             if snake.eatApple(self.apple):
-                SOUNDS['Apple'].play()
-                self.apple = Apple(random.randint(0, CELL_COUNT_X - 1 ), random.randint(0, CELL_COUNT_Y - 1))
+                if not self.apple.type == AppleTypes.NORMAL:
+                    snake.changeColor(APPLE_COLORS[self.apple.type])
+                self.apple = Apple(random.randint(0, CELL_COUNT_X - 1 ), random.randint(0, CELL_COUNT_Y - 1), random.choices([0, 1, 2], weights=[8, 1, 1])[0])
         return True
 
     def drawSnakes(self, surface, cell_size):
@@ -134,19 +176,19 @@ class Page:
                 return button
 
     def getKeys(self, key):
-        for action, keyboard in self.keys.items():
-            if isinstance(keyboard, list):
-                if key in keyboard:
+        for action, keys in self.keys.items():
+            if isinstance(keys, list):
+                if key in keys:
                     return action
             else:
-                if key == keyboard:
+                if key == keys:
                     return action
 
     def display_text(self, text, dimension, color, position, *background):
         font = pygame.font.Font('resources/font.otf', int(dimension))
         text_surface = font.render(text, True, color, background)
         rect = text_surface.get_rect()
-        rect.center = position
+        rect.midbottom = position
         self.surface.blit(text_surface, rect)
         return rect
 
@@ -163,12 +205,12 @@ class Menu(Page):
         super().update()
         width = self.surface.get_width()
         height = self.surface.get_height()
-        self.display_text('Python', height / 5, BLUE, (width / 3 + width / 64, height / 3))
-        self.display_text('VS', height / 5, RED, (width / 2 + width / 64, height / 3))
-        self.display_text('Viper', height / 5, GREEN, (2 * width / 3 - width / 64, height / 3))
-        self.buttons['Single'] = self.display_text('Single Player', height / 10, WHITE, (width / 3, 2 * height / 3))
-        self.buttons['Multi'] = self.display_text('Multi Player', height / 10, WHITE, (2 * width / 3, 2 * height / 3))
-        self.buttons['Settings'] = self.display_text(' Settings ', height / 10, BLACK, (width / 2, 2.5 * height / 3), WHITE)
+        self.display_text('Python', height / 4, BLUE, (2 * width / 7 + width / 32, 2 * height / 5))
+        self.display_text('VS', height / 7, RED, (width / 2 + width / 40, 2 * height / 5 - height / 50))
+        self.display_text('Viper', height / 4, GREEN, (5 * width / 7 - width / 32, 2 * height / 5))
+        self.buttons['Single'] = self.display_text('Single Player', height / 10, WHITE, (width / 3, 4.5 * height / 7))
+        self.buttons['Multi'] = self.display_text('Multi Player', height / 10, WHITE, (2 * width / 3, 4.5 * height / 7))
+        self.buttons['Settings'] = self.display_text(' Settings ', height / 10, BLACK, (width / 2, 6 * height / 7), WHITE)
 
 class Settings(Page):
 
@@ -183,18 +225,19 @@ class Settings(Page):
         super().update()
         width = self.surface.get_width()
         height = self.surface.get_height()
-        self.display_text('Difficulty:', height / 10, WHITE, (width / 2, height / 6))
-        self.buttons['Easy'] = self.display_text(' Easy ', height / 10, WHITE if self.easy else RED, (width / 3, 2 * height / 6), RED if self.easy else BLACK)
-        self.buttons['Hard'] = self.display_text(' Hard ', height / 10, WHITE if not self.easy else RED, (2 * width / 3, 2 * height / 6), RED if not self.easy else BLACK)
-        self.display_text('Audio:', height / 10, WHITE, (width / 2, 3 * height / 6))
-        self.buttons['Sound'] = self.display_text(' Sound ', height / 10, WHITE if self.sound else RED, (width / 3, 4 * height / 6), RED if self.sound else BLACK)
-        self.buttons['Music'] = self.display_text(' Music ', height / 10, WHITE if self.music else RED, (2 * width / 3, 4 * height / 6), RED if self.music else BLACK)
-        self.buttons['Menu'] = self.display_text(' Done ', height / 10, BLACK, (width / 2, 5 * height / 6), WHITE)
+        self.display_text('Difficulty:', height / 10, WHITE, (width / 2, 2 * height / 7))
+        self.buttons['Easy'] = self.display_text(' Easy ', height / 10, WHITE if self.easy else RED, (width / 3, 3 * height / 7), RED if self.easy else BLACK)
+        self.buttons['Hard'] = self.display_text(' Hard ', height / 10, WHITE if not self.easy else RED, (2 * width / 3, 3 * height / 7), RED if not self.easy else BLACK)
+        self.display_text('Audio:', height / 10, WHITE, (width / 2, 4 * height / 7))
+        self.buttons['Sound'] = self.display_text(' Sound ', height / 10, WHITE if self.sound else RED, (width / 3, 5 * height / 7), RED if self.sound else BLACK)
+        self.buttons['Music'] = self.display_text(' Music ', height / 10, WHITE if self.music else RED, (2 * width / 3, 5 * height / 7), RED if self.music else BLACK)
+        self.buttons['Menu'] = self.display_text(' Done ', height / 10, BLACK, (width / 2, 6 * height / 7), WHITE)
 
 class GameField(Page):
 
-    def __init__(self, width, height):
+    def __init__(self, width, height, cell_size):
         super().__init__(width, height)
+        self.cell_size = cell_size
         self.keys['Menu'] = K_ESCAPE
         self.keys['Python'] = [K_RIGHT, K_DOWN, K_LEFT, K_UP]
         self.keys['Viper'] = [K_d, K_s, K_a, K_w]
@@ -202,11 +245,15 @@ class GameField(Page):
 
     def update(self):
         super().update()
+        width = self.surface.get_width()
+        height = self.surface.get_height()
         if not self.game == None:
-            self.display_text('Python: ' + str(self.game.snakes[0].score), height / 9, BLUE, (width / 8, height / 10))
+            rect = self.display_text('Python: ' + str(self.game.snakes[0].score), height / 10, BLUE, (width / 8, height / 7))
+            self.display_text('x' + str(self.game.snakes[0].lives), height / 16, BLUE, (rect.right + width / 30, height / 7 - height / 100))
             if len(self.game.snakes) == 2:
-                self.display_text('Viper: ' + str(self.game.snakes[1].score), height / 9, GREEN, (width / 1.13, height / 10))
-            self.game.drawSnakes(self.surface, cell_size)
+                rect = self.display_text('Viper: ' + str(self.game.snakes[1].score), height / 10, GREEN, (width / 1.13, height / 7))
+                self.display_text('x' + str(self.game.snakes[1].lives), height / 16, GREEN, (rect.left - width / 40, height / 7 - height / 100))
+            self.game.drawSnakes(self.surface, self.cell_size)
 
 class GameOver(Page):
 
@@ -218,25 +265,27 @@ class GameOver(Page):
 
     def update(self):
         super().update()
+        width = self.surface.get_width()
+        height = self.surface.get_height()
         if not self.game == None:
-            self.display_text('Game Over!', height / 5, RED, (width / 2, height / 4))
+            self.display_text('Game Over!', height / 4, RED, (width / 2, 2 * height / 5))
             if len(self.game.snakes) == 1:
-                self.display_text('Score: ' + str(self.game.snakes[0].score), height / 8, YELLOW, (width / 2, height /2))
+                self.display_text('Score: ' + str(self.game.snakes[0].score), height / 8, YELLOW, (width / 2, 4 * height / 7))
             else:
-                self.display_text('Python: ' + str(self.game.snakes[0].score), height / 8, BLUE, (width / 3, height /2))
-                self.display_text('Viper: ' + str(self.game.snakes[1].score), height / 8, GREEN, (2 * width / 3, height /2))
-            self.buttons['Restart'] = self.display_text('Press Enter to restart the game', height / 12, WHITE, (width / 2, 3 * height / 4 - height / 20))
-            self.buttons['Menu'] = self.display_text('Press Esc to retrun the menu', height / 12, WHITE, (width / 2, 3 * height / 4 + height / 20))
+                self.display_text('Python: ' + str(self.game.snakes[0].score), height / 8, BLUE, (width / 3, 4 * height / 7))
+                self.display_text('Viper: ' + str(self.game.snakes[1].score), height / 8, GREEN, (2 * width / 3, 4 * height / 7))
+            self.buttons['Restart'] = self.display_text('Press Enter to restart the game', height / 12, WHITE, (width / 2, 4 * height / 5 - height / 15))
+            self.buttons['Menu'] = self.display_text('Press Esc to retrun the menu', height / 12, WHITE, (width / 2, 4 * height / 5 + height / 15))
 
 class UserInterface:
 
-    def __init__(self, width, height):
+    def __init__(self, width, height, cell_size):
         self.screen = pygame.display.set_mode((width, height), pygame.HWSURFACE)
         self.game = None
         self.pages = {}
         self.pages['Menu'] = Menu(width, height)
         self.pages['Settings'] = Settings(width, height)
-        self.pages['Game'] = GameField(width, height)
+        self.pages['Game'] = GameField(width, height, cell_size)
         self.pages['GameOver'] = GameOver(width, height)
         for page in self.pages:
             self.pages[page].update()
@@ -264,15 +313,15 @@ class UserInterface:
                 pressed = self.pages[self.current_page].getKeys(event.key)
             elif event.type == MOUSEBUTTONDOWN:
                 pressed = self.pages[self.current_page].getButton(event.pos)
-            if not 'pressed' in locals():
+            else:
                 continue
             if pressed == 'Python' and not flagPython:
                 if self.game.snakes[0].changeDirection(self.pages['Game'].keys['Python'].index(event.key)):
                     flagPython = True
-            elif pressed == 'Viper' and len(self.pages['Game'].game.snakes) == 2 and not flagViper:
+            elif pressed == 'Viper' and len(self.game.snakes) == 2 and not flagViper:
                 if self.game.snakes[1].changeDirection(self.pages['Game'].keys['Viper'].index(event.key)):
                     flagViper = True
-            elif pressed == 'Single':
+            if pressed == 'Single':
                 self.game = Game(1, EASY if self.pages['Settings'].easy else HARD)
                 self.pages['Game'].game = self.game
                 self.pages['GameOver'].game = self.game
@@ -316,7 +365,11 @@ class UserInterface:
 
     def playMusic(self, page):
         if not self.current_page == 'Settings' and page in MUSIC.keys():
-            pygame.mixer.music.load(MUSIC[page])
+            if page == 'Game':
+                pygame.mixer.music.load(MUSIC[page][0 if
+                    self.pages['Settings'].easy else 1])
+            else:
+                pygame.mixer.music.load(MUSIC[page])
             pygame.mixer.music.play(loops=-1)
 
 # Init
@@ -326,23 +379,32 @@ icon = pygame.image.load('resources/icon.png')
 pygame.display.set_icon(icon)
 
 # Colors
+BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 RED = (255, 0, 0)
-YELLOW = (255, 255, 0)
 GREEN = (0, 255, 0)
 BLUE = (0, 0, 255)
-BLACK = (0, 0, 0)
+YELLOW = (255, 255, 0)
+CYAN = (0, 255, 255)
+MAGENTA = (255, 0, 255)
+APPLE_COLORS = {
+        AppleTypes.NORMAL : RED,
+        AppleTypes.GOLDEN : YELLOW,
+        AppleTypes.LIFE : MAGENTA
+        }
+
 # Music
 MUSIC = {
         'Menu' : 'resources/intro.wav',
-        'Game' : 'resources/snake.wav',
+        'Game' : ['resources/easy.wav', 'resources/hard.wav'],
         'GameOver' : 'resources/game_over.wav'
         }
 # Sounds
 SOUNDS = {
         'Apple' : pygame.mixer.Sound('resources/apple.wav'),
-        'Snake' : pygame.mixer.Sound('resources/apple.wav'),
-        'Border' : pygame.mixer.Sound('resources/apple.wav')
+        'Golden' : pygame.mixer.Sound('resources/golden.wav'),
+        'Life' : pygame.mixer.Sound('resources/life.wav'),
+        'Hit' : pygame.mixer.Sound('resources/hit.wav'),
         }
 # Grid Size
 CELL_COUNT_X = 96
@@ -350,15 +412,17 @@ CELL_COUNT_Y = 54
 # FPS
 EASY = 30
 HARD = 60
-# Animation
+# Utils
 ANIMATION_SPEED = 5
+APPLE_EXPIRATION = 120
+SNAKE_EXPIRATION = 40
 
 # Adapt size to screen
-cell_size = int(pygame.display.Info().current_w / 150)
+cell_size = int(pygame.display.Info().current_w / 130)
 width = CELL_COUNT_X * cell_size
 height = CELL_COUNT_Y * cell_size
 
-ui = UserInterface(width, height)
+ui = UserInterface(width, height, cell_size)
 ui.changePage('Menu')
 
 # Loop
