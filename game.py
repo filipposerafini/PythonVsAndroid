@@ -262,20 +262,32 @@ class GameOver(Page):
         self.keys['Menu'] = K_ESCAPE
         self.keys['Restart'] = K_RETURN
         self.game = None
+        self.scores = None
 
     def update(self):
         super().update()
         width = self.surface.get_width()
         height = self.surface.get_height()
         if not self.game == None:
-            self.display_text('Game Over!', height / 4, RED, (width / 2, 2 * height / 5))
+            self.display_text('Game Over!', height / 4, RED, (width / 2, 2 * height / 6))
             if len(self.game.snakes) == 1:
-                self.display_text('Score: ' + str(self.game.snakes[0].score), height / 8, YELLOW, (width / 2, 4 * height / 7))
+                self.display_text('Score: ' + str(self.game.snakes[0].score), height / 8, CYAN, (width / 2, height / 2))
+                self.display_text(' Leaderboard: ', height / 10, WHITE, (width / 2, 4 * height / 7 + height / 10))
+                for i in range(0, 3):
+                    self.display_text(str(i + 1) + '. ', height / 15, CYAN if self.scores[i] is self.game.snakes[0].score else WHITE, (3 * width / 7, 4 * height / 7 + (i + 2) * height / 11))
+                    self.display_text(str(self.scores[i]), height / 15, CYAN if self.scores[i] is self.game.snakes[0].score else WHITE, (4 * width / 7, 4 * height / 7 + (i + 2) * height / 11))
             else:
-                self.display_text('Python: ' + str(self.game.snakes[0].score), height / 8, BLUE, (width / 3, 4 * height / 7))
-                self.display_text('Viper: ' + str(self.game.snakes[1].score), height / 8, GREEN, (2 * width / 3, 4 * height / 7))
-            self.buttons['Restart'] = self.display_text('Press Enter to restart the game', height / 12, WHITE, (width / 2, 4 * height / 5 - height / 15))
-            self.buttons['Menu'] = self.display_text('Press Esc to retrun the menu', height / 12, WHITE, (width / 2, 4 * height / 5 + height / 15))
+                if self.game.snakes[0].score > self.game.snakes[1].score:
+                    # self.display_text('Python: ' + str(self.game.snakes[0].score), height / 8, BLUE, (width / 3, 4 * height / 7))
+                    self.display_text('Python Won!', height / 8, BLUE, (width / 2, 4 * height / 7))
+                elif self.game.snakes[0].score < self.game.snakes[1].score:
+                    # self.display_text('Viper: ' + str(self.game.snakes[1].score), height / 8, GREEN, (2 * width / 3, 4 * height / 7))
+                    self.display_text('Viper Won!', height / 8, GREEN, (width / 2, 4 * height / 7))
+                else:
+                    self.display_text('Draw!', height / 8, YELLOW, (width / 2, 4 * height / 7))
+            self.buttons['Menu'] = self.display_text('Return', height / 10, WHITE, (width / 7, 17 * height / 18))
+            self.buttons['Restart'] = self.display_text('Restart', height / 10, WHITE, (6 * width / 7, 17 * height / 18))
+
 
 class UserInterface:
 
@@ -298,6 +310,10 @@ class UserInterface:
             pygame.display.flip()
 
     def changePage(self, page):
+        if page == 'GameOver' and len(self.game.snakes) == 1:
+            self.pages[page].scores = self.readLeaderboard('resources/highscores')
+        elif self.current_page == 'GameOver' and len(self.game.snakes) == 1:
+            self.writeLeaderboard('resources/highscores', self.pages[self.current_page].scores)
         self.playMusic(page)
         self.current_page = page
         self.pages[self.current_page].update()
@@ -371,6 +387,23 @@ class UserInterface:
             else:
                 pygame.mixer.music.load(MUSIC[page])
             pygame.mixer.music.play(loops=-1)
+
+    def readLeaderboard(self, file):
+        scores = []
+        try:
+            with open('resources/.highscores', 'r') as f:
+                for line in f:
+                    scores.append(int(line.strip()))
+            scores.append(self.game.snakes[0].score)
+            scores.sort(reverse=True)
+        except FileNotFoundError:
+            scores = [0,0,0]
+        return scores
+
+    def writeLeaderboard(self, file, scores):
+        with open('resources/.highscores', 'w') as f:
+            for s in scores[:3]:
+                f.write(str(s) + '\n')
 
 # Init
 pygame.init()
