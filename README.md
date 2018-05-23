@@ -17,7 +17,7 @@ and run `python3 game.py`
 
 ## Thanks
 
-Special thanks to **Alessandro Berionni**, the author of the songs present in the game
+Special thanks to **Alessandro Berionni**, the author of the songs present in the game.
 
 ## License
 
