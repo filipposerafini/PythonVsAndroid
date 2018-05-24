@@ -66,19 +66,25 @@ class Snake:
         self.temp_color = color
         self.expiration = SNAKE_EXPIRATION
 
-    def eatApple(self, apple):
-        if self.isCollision(apple.x, apple.y):
+    def addPiece(self, count):
+        for i in range(0, count):
             self.x.append(self.x[self.length - 1])
             self.y.append(self.y[self.length - 1])
             self.length += 1
+
+    def eatApple(self, apple):
+        if self.isCollision(apple.x, apple.y):
             if apple.type == AppleTypes.NORMAL:
-                self.score += 10
                 SOUNDS['Apple'].play()
+                self.addPiece(1)
+                self.score += 10
             elif apple.type == AppleTypes.GOLDEN:
                 SOUNDS['Golden'].play()
+                self.addPiece(3)
                 self.score += 50
             elif apple.type == AppleTypes.LIFE:
                 SOUNDS['Life'].play()
+                self.addPiece(1)
                 if self.lives < 5:
                     self.lives += 1
                 else:
@@ -96,15 +102,19 @@ class Snake:
 
     def hitBorder(self):
         if self.x[0] < 0 or self.x[0] > CELL_COUNT_X - 1:
-            self.score -= 20
-            self.lives -= 1
             self.x[0] = CELL_COUNT_X - 1 if self.x[0] < 0 else 0
-            return True
+            if not self.temp_color == RED:
+                self.score -= 20
+                self.lives -= 1
+                return True
+            return False
         elif self.y[0] < 0 or self.y[0] > CELL_COUNT_Y - 1:
-            self.score -= 20
-            self.lives -= 1
             self.y[0] = CELL_COUNT_Y - 1 if self.y[0] < 0 else 0
-            return True
+            if not self.temp_color == RED:
+                self.score -= 20
+                self.lives -= 1
+                return True
+            return False
         else:
             return False
 
@@ -239,8 +249,9 @@ class GameField(Page):
         super().__init__(width, height)
         self.cell_size = cell_size
         self.keys['Menu'] = K_ESCAPE
-        self.keys['Python'] = [K_RIGHT, K_DOWN, K_LEFT, K_UP]
-        self.keys['Viper'] = [K_d, K_s, K_a, K_w]
+        self.keys['Pause'] = K_p
+        self.keys['Python'] = [K_d, K_s, K_a, K_w]
+        self.keys['Viper'] = [K_RIGHT, K_DOWN, K_LEFT, K_UP]
         self.game = None
 
     def update(self):
@@ -254,6 +265,41 @@ class GameField(Page):
                 rect = self.display_text('Viper: ' + str(self.game.snakes[1].score), height / 10, GREEN, (width / 1.13, height / 7))
                 self.display_text('x' + str(self.game.snakes[1].lives), height / 16, GREEN, (rect.left - width / 40, height / 7 - height / 100))
             self.game.drawSnakes(self.surface, self.cell_size)
+
+class Pause(Page):
+
+    def __init__(self, width, height):
+        super().__init__(width, height)
+        self.keys['Unpause'] = K_p
+        self.game_surface = pygame.Surface((width, height))
+
+    def update(self):
+        super().update()
+        self.surface.fill(WHITE)
+        self.game_surface.set_alpha(220)
+        self.surface.blit(self.game_surface, (0, 0))
+        width = self.surface.get_width()
+        height = self.surface.get_height()
+        self.display_text('Paused', height / 4, YELLOW, (width / 2, height / 2))
+
+class Confirm(Page):
+
+    def __init__(self, width, height):
+        super().__init__(width, height)
+        self.keys['Yes'] = K_RETURN
+        self.keys['No'] = K_ESCAPE
+        self.game_surface = pygame.Surface((width, height))
+
+    def update(self):
+        super().update()
+        self.surface.fill(WHITE)
+        self.game_surface.set_alpha(220)
+        self.surface.blit(self.game_surface, (0, 0))
+        width = self.surface.get_width()
+        height = self.surface.get_height()
+        self.display_text('Are you sure?', height / 4, YELLOW, (width / 2, height / 2))
+        self.buttons['Yes'] = self.display_text('Yes', height / 8, GREEN, (2 * width / 5, 2 * height / 3))
+        self.buttons['No'] = self.display_text('No', height / 8, RED, (3 * width / 5, 2 * height / 3))
 
 class GameOver(Page):
 
@@ -272,19 +318,37 @@ class GameOver(Page):
             self.display_text('Game Over!', height / 4, RED, (width / 2, 2 * height / 6))
             if len(self.game.snakes) == 1:
                 self.display_text('Score: ' + str(self.game.snakes[0].score), height / 8, CYAN, (width / 2, height / 2))
-                self.display_text(' Leaderboard: ', height / 10, WHITE, (width / 2, 4 * height / 7 + height / 10))
-                for i in range(0, 3):
-                    self.display_text(str(i + 1) + '. ', height / 15, CYAN if self.scores[i] is self.game.snakes[0].score else WHITE, (3 * width / 7, 4 * height / 7 + (i + 2) * height / 11))
-                    self.display_text(str(self.scores[i]), height / 15, CYAN if self.scores[i] is self.game.snakes[0].score else WHITE, (4 * width / 7, 4 * height / 7 + (i + 2) * height / 11))
+                self.display_text('Leaderboard:', height / 10, WHITE, (width / 2, 4 * height / 7 + height / 10))
+                self.scores.append(self.game.snakes[0].score)
+                self.scores = list(set(self.scores))
+                self.scores.sort(reverse=True)
+                for i in range(0, min(len(self.scores), 3)):
+                    self.display_text(str(i + 1) + '. ', height / 15, CYAN if self.scores[i] == self.game.snakes[0].score else WHITE, (3 * width / 7, 4 * height / 7 + (i + 2) * height / 11))
+                    self.display_text(str(self.scores[i]), height / 15, CYAN if self.scores[i] == self.game.snakes[0].score else WHITE, (4 * width / 7, 4 * height / 7 + (i + 2) * height / 11))
             else:
-                if self.game.snakes[0].score > self.game.snakes[1].score:
-                    # self.display_text('Python: ' + str(self.game.snakes[0].score), height / 8, BLUE, (width / 3, 4 * height / 7))
-                    self.display_text('Python Won!', height / 8, BLUE, (width / 2, 4 * height / 7))
-                elif self.game.snakes[0].score < self.game.snakes[1].score:
-                    # self.display_text('Viper: ' + str(self.game.snakes[1].score), height / 8, GREEN, (2 * width / 3, 4 * height / 7))
-                    self.display_text('Viper Won!', height / 8, GREEN, (width / 2, 4 * height / 7))
+                total = []
+                self.display_text('Score:', height / 15, BLUE, (width / 6, 3 * height / 7))
+                self.display_text(str(self.game.snakes[0].score), height / 15, BLUE, (2 * width / 6, 3 * height / 7))
+                self.display_text('Lives:', height / 15, BLUE, (width / 6, 4 * height / 7))
+                self.display_text(str(self.game.snakes[0].lives * 20), height / 15, BLUE, (2 * width / 6, 4 * height / 7))
+                pygame.draw.line(self.surface, WHITE, (width / 8, 4 * height / 7 + height / 30), (3 * width / 8, 4 * height / 7 + height / 30), 8)
+                total.append(self.game.snakes[0].score + self.game.snakes[0].lives * 20)
+                self.display_text('Total:', height / 15, BLUE, (width / 6, 5 * height / 7))
+                self.display_text(str(total[0]), height / 15, BLUE, (2 * width / 6, 5 * height / 7))
+                self.display_text('Score:', height / 15, GREEN, (4 * width / 6, 3 * height / 7))
+                self.display_text(str(self.game.snakes[1].score), height / 15, GREEN, (5 * width / 6, 3 * height / 7))
+                self.display_text('Lives:', height / 15, GREEN, (4 * width / 6, 4 * height / 7))
+                self.display_text(str(self.game.snakes[1].lives * 20), height / 15, GREEN, (5 * width / 6, 4 * height / 7))
+                pygame.draw.line(self.surface, WHITE, (5 * width / 8, 4 * height / 7 + height / 30), (7 * width / 8, 4 * height / 7 + height / 30), 8)
+                total.append(self.game.snakes[1].score + self.game.snakes[1].lives * 20)
+                self.display_text('Total:', height / 15, GREEN, (4 * width / 6, 5 * height / 7))
+                self.display_text(str(total[1]), height / 15, GREEN, (5 * width / 6, 5 * height / 7))
+                if total[0] > total[1]:
+                    self.display_text('Python Won!', height / 8, BLUE, (width / 2, 17 * height / 18))
+                elif total[0] < total[1]:
+                    self.display_text('Viper Won!', height / 8, GREEN, (width / 2, 17 * height / 18))
                 else:
-                    self.display_text('Draw!', height / 8, YELLOW, (width / 2, 4 * height / 7))
+                    self.display_text('Draw!', height / 8, YELLOW, (width / 2, 17 * height / 18))
             self.buttons['Menu'] = self.display_text('Return', height / 10, WHITE, (width / 7, 17 * height / 18))
             self.buttons['Restart'] = self.display_text('Restart', height / 10, WHITE, (6 * width / 7, 17 * height / 18))
 
@@ -298,6 +362,8 @@ class UserInterface:
         self.pages['Menu'] = Menu(width, height)
         self.pages['Settings'] = Settings(width, height)
         self.pages['Game'] = GameField(width, height, cell_size)
+        self.pages['Pause'] = Pause(width, height)
+        self.pages['Confirm'] = Confirm(width, height)
         self.pages['GameOver'] = GameOver(width, height)
         for page in self.pages:
             self.pages[page].update()
@@ -361,7 +427,20 @@ class UserInterface:
                 self.pages['Settings'].music = not self.pages['Settings'].music
                 pygame.mixer.music.set_volume(1 if self.pages['Settings'].music else 0)
             elif pressed == 'Menu':
+                if self.current_page == 'Game':
+                    self.pages['Confirm'].game_surface = self.pages['Game'].surface
+                    self.changePage('Confirm')
+                else:
+                    self.changePage('Menu')
+            elif pressed == 'Pause':
+                self.pages['Pause'].game_surface = self.pages['Game'].surface
+                self.changePage('Pause')
+            elif pressed == 'Unpause':
+                self.changePage('Game')
+            elif pressed == 'Yes':
                 self.changePage('Menu')
+            elif pressed == 'No':
+                self.changePage('Game')
             elif pressed == 'Restart':
                 self.game = self.game.restart()
                 self.pages['Game'].game = self.game
@@ -382,11 +461,16 @@ class UserInterface:
     def playMusic(self, page):
         if not self.current_page == 'Settings' and page in MUSIC.keys():
             if page == 'Game':
-                pygame.mixer.music.load(MUSIC[page][0 if
-                    self.pages['Settings'].easy else 1])
+                if self.current_page == 'Pause' or self.current_page == 'Confirm':
+                    pygame.mixer.music.unpause()
+                else:
+                    pygame.mixer.music.load(MUSIC[page][0 if self.pages['Settings'].easy else 1])
+                    pygame.mixer.music.play(loops=-1)
+            elif page == 'Pause' or page == 'Confirm':
+                pygame.mixer.music.pause()
             else:
                 pygame.mixer.music.load(MUSIC[page])
-            pygame.mixer.music.play(loops=-1)
+                pygame.mixer.music.play(loops=-1)
 
     def readLeaderboard(self, file):
         scores = []
@@ -394,10 +478,8 @@ class UserInterface:
             with open('resources/.highscores', 'r') as f:
                 for line in f:
                     scores.append(int(line.strip()))
-            scores.append(self.game.snakes[0].score)
-            scores.sort(reverse=True)
-        except FileNotFoundError:
-            scores = [0,0,0]
+        except:
+            scores = []
         return scores
 
     def writeLeaderboard(self, file, scores):
@@ -430,6 +512,8 @@ APPLE_COLORS = {
 MUSIC = {
         'Menu' : 'resources/intro.wav',
         'Game' : ['resources/easy.wav', 'resources/hard.wav'],
+        'Pause' : None,
+        'Confirm' : None,
         'GameOver' : 'resources/game_over.wav'
         }
 # Sounds
