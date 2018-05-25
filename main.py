@@ -158,7 +158,7 @@ class Game:
             if snake.eatApple(self.apple):
                 if not self.apple.type == AppleTypes.NORMAL:
                     snake.changeColor(APPLE_COLORS[self.apple.type])
-                self.apple = Apple(random.randint(0, CELL_COUNT_X - 1 ), random.randint(0, CELL_COUNT_Y - 1), random.choices([0, 1, 2], weights=[8, 1, 1])[0])
+                self.apple = Apple(random.randint(0, CELL_COUNT_X - 1 ), random.randint(0, CELL_COUNT_Y - 1), random.choice([0, 0, 0, 0, 0, 0, 0, 0, 1, 2]))
         return True
 
     def drawSnakes(self, surface, cell_size):
@@ -167,7 +167,7 @@ class Game:
         self.apple.draw(surface, cell_size)
         self.clock.tick(self.fps)
 
-class Page:
+class Page(object):
 
     def __init__(self, width, height):
         self.surface = pygame.Surface((width, height))
@@ -194,7 +194,7 @@ class Page:
                 if key == keys:
                     return action
 
-    def display_text(self, text, dimension, color, position, *background):
+    def display_text(self, text, dimension, color, position, background=None):
         font = pygame.font.Font('resources/font.otf', int(dimension))
         text_surface = font.render(text, True, color, background)
         rect = text_surface.get_rect()
@@ -205,14 +205,14 @@ class Page:
 class Menu(Page):
 
     def __init__(self, width, height):
-        super().__init__(width, height)
+        super(Menu, self).__init__(width, height)
         self.keys['Single'] = K_1
         self.keys['Multi'] = K_2
         self.keys['Settings'] = K_TAB
         self.keys['Quit'] = K_ESCAPE
 
     def update(self):
-        super().update()
+        super(Menu, self).update()
         width = self.surface.get_width()
         height = self.surface.get_height()
         self.display_text('Python', height / 4, BLUE, (2 * width / 7 + width / 32, 2 * height / 5))
@@ -225,14 +225,14 @@ class Menu(Page):
 class Settings(Page):
 
     def __init__(self, width, height):
-        super().__init__(width, height)
+        super(Settings, self).__init__(width, height)
         self.keys['Menu'] = K_TAB
         self.easy = True
         self.sound = True
         self.music = True
 
     def update(self):
-        super().update()
+        super(Settings, self).update()
         width = self.surface.get_width()
         height = self.surface.get_height()
         self.display_text('Difficulty:', height / 10, WHITE, (width / 2, 2 * height / 7))
@@ -246,7 +246,7 @@ class Settings(Page):
 class GameField(Page):
 
     def __init__(self, width, height, cell_size):
-        super().__init__(width, height)
+        super(GameField, self).__init__(width, height)
         self.cell_size = cell_size
         self.keys['Menu'] = K_ESCAPE
         self.keys['Pause'] = K_p
@@ -255,7 +255,7 @@ class GameField(Page):
         self.game = None
 
     def update(self):
-        super().update()
+        super(GameField, self).update()
         width = self.surface.get_width()
         height = self.surface.get_height()
         if not self.game == None:
@@ -269,12 +269,12 @@ class GameField(Page):
 class Pause(Page):
 
     def __init__(self, width, height):
-        super().__init__(width, height)
+        super(Pause, self).__init__(width, height)
         self.keys['Unpause'] = K_p
         self.game_surface = pygame.Surface((width, height))
 
     def update(self):
-        super().update()
+        super(Pause, self).update()
         self.surface.fill(WHITE)
         self.game_surface.set_alpha(220)
         self.surface.blit(self.game_surface, (0, 0))
@@ -285,13 +285,13 @@ class Pause(Page):
 class Confirm(Page):
 
     def __init__(self, width, height):
-        super().__init__(width, height)
+        super(Confirm, self).__init__(width, height)
         self.keys['Yes'] = K_RETURN
         self.keys['No'] = K_ESCAPE
         self.game_surface = pygame.Surface((width, height))
 
     def update(self):
-        super().update()
+        super(Confirm, self).update()
         self.surface.fill(WHITE)
         self.game_surface.set_alpha(220)
         self.surface.blit(self.game_surface, (0, 0))
@@ -304,14 +304,14 @@ class Confirm(Page):
 class GameOver(Page):
 
     def __init__(self, width, height):
-        super().__init__(width, height)
+        super(GameOver, self).__init__(width, height)
         self.keys['Menu'] = K_ESCAPE
         self.keys['Restart'] = K_RETURN
         self.game = None
         self.scores = None
 
     def update(self):
-        super().update()
+        super(GameOver, self).update()
         width = self.surface.get_width()
         height = self.surface.get_height()
         if not self.game == None:
@@ -530,7 +530,7 @@ CELL_COUNT_Y = 54
 EASY = 30
 HARD = 60
 # Utils
-ANIMATION_SPEED = 5
+ANIMATION_SPEED = 20
 APPLE_EXPIRATION = 120
 SNAKE_EXPIRATION = 40
 
