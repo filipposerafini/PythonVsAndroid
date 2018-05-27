@@ -5,6 +5,7 @@ import random
 import pygame
 from pygame.locals import *
 import android
+import android.mixer as mixer
 
 class AppleTypes:
 
@@ -209,39 +210,76 @@ class Menu(Page):
         self.display_text('Android', height / 4, GREEN, (5 * width / 7, 2 * height / 5))
         self.buttons['Single'] = self.display_text('Single Player', height / 10, WHITE, (width / 3, 4.5 * height / 7))
         self.buttons['Multi'] = self.display_text('Multi Player', height / 10, WHITE, (2 * width / 3, 4.5 * height / 7))
-        self.buttons['Settings'] = self.display_text(' Settings ', height / 10, BLACK, (width / 2, 6 * height / 7), WHITE)
+        self.buttons['Settings'] = self.display_text(' Settings ', height / 10, BLACK, (width / 3, 6 * height / 7), WHITE)
+        self.buttons['Leaderboard'] = self.display_text(' Leaderboard ', height / 10, BLACK, (2 * width / 3, 6 * height / 7), WHITE)
+
+class Leaderboard(Page):
+
+    def __init__(self, width, height):
+        super(Leaderboard, self).__init__(width, height)
+        self.scores = {
+                DIFFICULTY['Easy']: [],
+                DIFFICULTY['Normal']: [],
+                DIFFICULTY['Hard']: []
+                }
+
+    def update(self):
+        self.display_text('Leaderboard:', height / 6, YELLOW, (width / 2, 2 * height / 7))
+        difficulty = ['Easy', 'Normal', 'Hard']
+        for i in range (1, 4):
+            self.display_text(str(i) + '.', height / 10, BLUE, (width / 12, height / 2 + (i + 1) * height / 10))
+        for j in range(0, len(self.scores.keys())):
+            key = list(self.scores.keys())[j]
+            self.display_text(difficulty[j], height / 8, RED, ((j + 1) * width / 4, height / 2))
+            score = self.scores[key]
+            for i in range(0, min(len(score), 3)):
+                self.display_text(str(score[i]), height / 10, WHITE, ((j + 1) * width / 4, height / 2 + (i + 2) * height / 10))
 
 class Settings(Page):
 
     def __init__(self, width, height):
         super(Settings, self).__init__(width, height)
-        self.difficulty = DIFFICULTY['Easy']
-        self.controls = 'Touch'
+        self.difficulty = 1
+        self.controls = 0
         self.sound = True
         self.music = True
+        self.loadSettings()
 
     def update(self):
         super(Settings, self).update()
         width = self.surface.get_width()
         height = self.surface.get_height()
-        self.display_text('Difficulty:', height / 10, WHITE, (width / 2, height / 7))
-        self.buttons['Easy'] = self.display_text(' Easy ', height / 10, WHITE if self.difficulty == DIFFICULTY['Easy'] else RED,
-                (width / 4, 2 * height / 7), RED if self.difficulty == DIFFICULTY['Easy'] else BLACK)
-        self.buttons['Normal'] = self.display_text(' Normal ', height / 10, WHITE if self.difficulty == DIFFICULTY['Normal'] else RED,
-                (width / 2, 2 * height / 7), RED if self.difficulty == DIFFICULTY['Normal'] else BLACK)
-        self.buttons['Hard'] = self.display_text(' Hard ', height / 10, WHITE if self.difficulty == DIFFICULTY['Hard'] else RED,
-                (3 * width / 4, 2 * height / 7), RED if self.difficulty == DIFFICULTY['Hard'] else BLACK)
-        self.display_text('Audio:', height / 10, WHITE, (width / 2, 3 * height / 7))
-        self.buttons['Sound'] = self.display_text(' Sound ', height / 10, WHITE if self.sound else RED, (width / 3, 4 * height / 7), RED if self.sound else BLACK)
-        self.buttons['Music'] = self.display_text(' Music ', height / 10, WHITE if self.music else RED, (2 * width / 3, 4 * height / 7), RED if self.music else BLACK)
-        self.display_text('Controls:', height / 10, WHITE, (width / 2, 5 * height / 7))
-        self.buttons['Touch'] = self.display_text(' Touch ', height / 10, WHITE if self.controls == 'Touch' else RED,
-                (width / 4, 6 * height / 7), RED if self.controls == 'Touch'  else BLACK)
-        self.buttons['Buttons'] = self.display_text(' Buttons ', height / 10, WHITE if self.controls == 'Buttons' else RED,
-                (width / 2, 6 * height / 7), RED if self.controls == 'Buttons' else BLACK)
-        self.buttons['Inverted'] = self.display_text(' Inverted ', height / 10, WHITE if self.controls == 'Inverted' else RED,
-                (3 * width / 4, 6 * height / 7), RED if self.controls == 'Inverted' else BLACK)
-        self.buttons['Menu'] = self.display_text(' Done ', height / 10, BLACK, (width / 2, height), WHITE)
+        self.display_text('Difficulty:', height / 7, WHITE, (width / 3, 2 * height / 6))
+        key = list(DIFFICULTY.keys())[self.difficulty]
+        self.buttons['Difficulty'] = self.display_text(key, height / 7, RED, (7 * width / 10, 2 * height / 6))
+        self.display_text('Controls:', height / 7, WHITE, (width / 3 - width / 70, 7 * height / 12))
+        self.buttons['Controls'] = self.display_text(CONTROLS[self.controls], height / 7, RED, (7 * width / 10, 7 * height / 12))
+        self.display_text('Audio:', height / 7, WHITE, (width / 3 - width / 20, 5 * height / 6))
+        self.buttons['Music'] = self.display_text(' Music ', height / 9, WHITE if self.music else RED, (4 * width / 5, 5 * height / 6 - height / 50), RED if self.music else BLACK)
+        self.buttons['Sound'] = self.display_text(' Sound ', height / 9, WHITE if self.sound else RED, (3 * width / 5, 5 * height / 6 - height / 50), RED if self.sound else BLACK)
+
+    def loadSettings(self):
+        try:
+            with open('resources/.settings', 'r') as f:
+                for line in f:
+                    settings = line.split(':')
+                    if settings[0] == 'Difficulty':
+                        self.difficulty = int(settings[1][:-1])
+                    elif settings[0] == 'Controls':
+                        self.controls = int(settings[1][:-1])
+                    elif settings[0] == 'Music':
+                        self.music = settings[1][:-1] == 'True'
+                    elif settings[0] == 'Sound':
+                        self.sound = settings[1][:-1] == 'True'
+        except:
+            pass
+
+    def saveSettings(self):
+        with open('resources/.settings', 'w') as f:
+            f.write('Difficulty:' + str(self.difficulty) + '\n')
+            f.write('Controls:' + str(self.controls) + '\n')
+            f.write('Music:' + str(self.music) + '\n')
+            f.write('Sound:' + str(self.sound) + '\n')
 
 class GameField(Page):
 
@@ -261,13 +299,13 @@ class GameField(Page):
                 # rect = self.display_text('Viper: ' + str(self.game.snakes[1].score), height / 10, GREEN, (width / 1.13, height / 7))
                 # self.display_text('x' + str(self.game.snakes[1].lives), height / 16, GREEN, (rect.left - width / 40, height / 7 - height / 100))
             self.game.drawSnakes(self.surface, self.cell_size)
-            if self.game.controls == 'Touch':
+            if self.game.controls == CONTROLS.index('Touch'):
                 self.buttons['Move'] = Rect(0, 0, width, height)
                 self.buttons['Up'] = Rect(0, 0, 0, 0)
                 self.buttons['Down'] = Rect(0, 0, 0, 0)
                 self.buttons['Left'] = Rect(0, 0, 0, 0)
                 self.buttons['Right'] = Rect(0, 0, 0, 0)
-            if self.game.controls == 'Buttons':
+            if self.game.controls == CONTROLS.index('Buttons'):
                 self.buttons['Move'] = Rect(0, 0, 0, 0)
                 pointlist = [
                         (width / 5 - height / 14, 5 * height / 7 - height / 28),
@@ -293,7 +331,7 @@ class GameField(Page):
                         (4 * width / 5 + height / 28, 5 * height / 7 - height / 14)
                         ]
                 self.buttons['Right'] = pygame.draw.polygon(self.surface, GREY, pointlist)
-            if self.game.controls == 'Inverted':
+            if self.game.controls == CONTROLS.index('Inverted'):
                 self.buttons['Move'] = Rect(0, 0, 0, 0)
                 pointlist = [
                         (4 * width / 5 - height / 14, 5 * height / 7 - height / 28),
@@ -407,6 +445,10 @@ class UserInterface:
         self.pages['Menu'] = Menu(width, height)
         self.pages['NotImplemented'] = NotImplementedPage(width, height)
         self.pages['Settings'] = Settings(width, height)
+        self.pages['Leaderboard'] = Leaderboard(width, height)
+        self.pages['Leaderboard'].scores[DIFFICULTY['Easy']] = self.readLeaderboard(DIFFICULTY['Easy'])
+        self.pages['Leaderboard'].scores[DIFFICULTY['Normal']] = self.readLeaderboard(DIFFICULTY['Normal'])
+        self.pages['Leaderboard'].scores[DIFFICULTY['Hard']] = self.readLeaderboard(DIFFICULTY['Hard'])
         self.pages['Game'] = GameField(width, height, cell_size)
         self.pages['Pause'] = Pause(width, height)
         self.pages['GameOver'] = GameOver(width, height)
@@ -422,9 +464,10 @@ class UserInterface:
 
     def changePage(self, page):
         if page == 'GameOver' and len(self.game.snakes) == 1:
-            self.pages[page].scores = self.readLeaderboard()
+            self.pages[page].scores = self.readLeaderboard(self.game.fps)
         elif self.current_page == 'GameOver' and len(self.game.snakes) == 1:
-            self.writeLeaderboard(self.pages[self.current_page].scores)
+            self.saveLeaderboard(self.pages[self.current_page].scores, self.game.fps)
+            self.pages['Leaderboard'].scores[self.game.fps] = self.readLeaderboard(self.game.fps)
         self.playMusic(page)
         self.current_page = page
         self.pages[self.current_page].update()
@@ -451,7 +494,7 @@ class UserInterface:
             else:
                 continue
             if pressed == 'Single':
-                self.game = Game(1, self.pages['Settings'].difficulty, self.pages['Settings'].controls)
+                self.game = Game(1, list(DIFFICULTY.values())[self.pages['Settings'].difficulty], self.pages['Settings'].controls)
                 self.pages['Game'].game = self.game
                 self.pages['GameOver'].game = self.game
                 self.changePage('Game')
@@ -495,17 +538,19 @@ class UserInterface:
                 break
             elif pressed == 'Settings':
                 self.changePage('Settings')
-            elif pressed == 'Easy' or pressed == 'Normal' or pressed == 'Hard':
-                self.pages['Settings'].difficulty = DIFFICULTY[pressed]
-            elif pressed == 'Touch' or pressed == 'Buttons' or pressed == 'Inverted':
-                self.pages['Settings'].controls = pressed
+            elif pressed == 'Leaderboard':
+                self.changePage('Leaderboard')
+            elif pressed == 'Difficulty':
+                self.pages['Settings'].difficulty = (self.pages['Settings'].difficulty + 1) % 3
+            elif pressed == 'Controls':
+                self.pages['Settings'].controls = (self.pages['Settings'].controls + 1) % 3
             elif pressed == 'Sound':
                 self.pages['Settings'].sound = not self.pages['Settings'].sound
                 for sound in SOUNDS.values():
                     sound.set_volume(1 if self.pages['Settings'].sound else 0)
             elif pressed == 'Music':
                 self.pages['Settings'].music = not self.pages['Settings'].music
-                pygame.mixer.music.set_volume(1 if self.pages['Settings'].music else 0)
+                mixer.music.set_volume(1 if self.pages['Settings'].music else 0)
             elif pressed == 'Menu':
                     self.changePage('Menu')
             elif pressed == 'Pause':
@@ -535,27 +580,27 @@ class UserInterface:
         pygame.display.flip()
 
     def playMusic(self, page):
-        if not self.current_page == 'Settings' and not self.current_page == 'NotImplemented':
+        if not self.current_page == 'Settings' and not self.current_page == 'NotImplemented' and not self.current_page == 'Leaderboard':
             if page == 'Game':
                 if self.current_page == 'Pause':
-                    pygame.mixer.music.unpause()
+                    mixer.music.unpause()
                 else:
-                    pygame.mixer.music.load(MUSIC[self.game.fps])
-                    pygame.mixer.music.play(loops=-1)
+                    mixer.music.load(MUSIC[self.game.fps])
+                    mixer.music.play(loops=-1)
             elif page == 'Pause':
-                pygame.mixer.music.pause()
-            elif not page == 'Settings' and not page == 'NotImplemented':
-                pygame.mixer.music.load(MUSIC[page])
-                pygame.mixer.music.play(loops=-1)
+                mixer.music.pause()
+            elif not page == 'Settings' and not page == 'NotImplemented' and not page == 'Leaderboard':
+                mixer.music.load(MUSIC[page])
+                mixer.music.play(loops=-1)
 
-    def readLeaderboard(self):
+    def readLeaderboard(self, difficulty):
         scores = []
         try:
-            if self.game.fps == DIFFICULTY['Easy']:
+            if difficulty == DIFFICULTY['Easy']:
                 file = 'resources/.easy'
-            elif self.game.fps == DIFFICULTY['Normal']:
+            elif difficulty == DIFFICULTY['Normal']:
                 file = 'resources/.normal'
-            elif self.game.fps == DIFFICULTY['Hard']:
+            elif difficulty == DIFFICULTY['Hard']:
                 file = 'resources/.hard'
             with open(file, 'r') as f:
                 for line in f:
@@ -564,12 +609,12 @@ class UserInterface:
             scores = []
         return scores
 
-    def writeLeaderboard(self, scores):
-        if self.game.fps == DIFFICULTY['Easy']:
+    def saveLeaderboard(self, scores, difficulty):
+        if difficulty == DIFFICULTY['Easy']:
             file = 'resources/.easy'
-        elif self.game.fps == DIFFICULTY['Normal']:
+        elif difficulty == DIFFICULTY['Normal']:
             file = 'resources/.normal'
-        elif self.game.fps == DIFFICULTY['Hard']:
+        elif difficulty == DIFFICULTY['Hard']:
             file = 'resources/.hard'
         with open(file, 'w') as f:
             for s in scores[:3]:
@@ -600,6 +645,8 @@ DIFFICULTY = {
         'Normal' : 40,
         'Hard': 80
         }
+# Controls
+CONTROLS = ['Touch', 'Buttons', 'Inverted']
 # Music
 MUSIC = {
         'Menu' : 'resources/intro.wav',
@@ -612,10 +659,10 @@ MUSIC = {
         }
 # Sounds
 SOUNDS = {
-        'Apple' : pygame.mixer.Sound('resources/apple.wav'),
-        'Golden' : pygame.mixer.Sound('resources/golden.wav'),
-        'Life' : pygame.mixer.Sound('resources/life.wav'),
-        'Hit' : pygame.mixer.Sound('resources/hit.wav'),
+        'Apple' : mixer.Sound('resources/apple.wav'),
+        'Golden' : mixer.Sound('resources/golden.wav'),
+        'Life' : mixer.Sound('resources/life.wav'),
+        'Hit' : mixer.Sound('resources/hit.wav'),
         }
 # Utils
 ANIMATION_SPEED = 20
@@ -637,6 +684,8 @@ while ui.handle():
     ui.update()
     # if android.check_pause():
         # android.wait_for_resume()
+else:
+    ui.pages['Settings'].saveSettings()
 
 # Quit
 pygame.quit()
