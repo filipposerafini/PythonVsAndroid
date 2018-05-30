@@ -5,21 +5,72 @@ import random
 import pygame
 from pygame.locals import *
 import android
-import android.mixer as mixer
 
 class AppleTypes:
 
-    NORMAL, GOLDEN, LIFE = range(3)
+    NORMAL, GOLDEN, LIFE, SPECIAL = range(4)
 
 class Apple:
 
-    def __init__(self, x, y, type):
-        self.x = x
-        self.y = y
-        self.type = type
+    def __init__(self, snakes):
+        retry = True
+        while retry:
+            retry = False
+            self.x = random.randint(0, CELL_COUNT_X - 1)
+            self.y = random.randint(0, CELL_COUNT_Y - 1)
+            for snake in snakes:
+                for i in range(0, snake.length):
+                    if self.x == snake.x[i] and self.y == snake.y[i]:
+                        retry = True
+        self.type = random.choice([0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3])
         self.expiration = 0
+        self.moves = 0
+        self.direction = random.choice([0, 1, 2, 3])
         if not type == AppleTypes.NORMAL:
             self.expiration = APPLE_EXPIRATION
+            if type == AppleTypes.SPECIAL:
+                self.moves = SPECIAL_FRAMES
+
+    def move(self):
+        if self.moves == 0:
+            dir = random.choice([
+                self.direction,
+                self.direction,
+                self.direction,
+                self.direction,
+                self.direction,
+                self.direction,
+                self.direction,
+                (self.direction + 1) % 4,
+                (self.direction + 2) % 4,
+                (self.direction + 3) % 4])
+            if dir == 0:
+                if not self.x == CELL_COUNT_X - 1:
+                    self.x += 1
+                else:
+                    self.x -= 1
+                    self.direction = 2
+            if dir == 1:
+                if not self.y == CELL_COUNT_Y - 1:
+                    self.y += 1
+                else:
+                    self.y -= 1
+                    self.direction = 3
+            if dir == 2:
+                if not self.x == 0:
+                    self.x -= 1
+                else:
+                    self.x += 1
+                    self.direction = 1
+            if dir == 3:
+                if not self.y == 0:
+                    self.y -= 1
+                else:
+                    self.y += 1
+                    self.direction = 0
+            self.moves = SPECIAL_FRAMES
+        else:
+            self.moves -= 1
 
     def draw(self, surface, cell_size):
         body = pygame.Surface((cell_size, cell_size))
@@ -94,6 +145,10 @@ class Snake:
                     self.lives += 1
                 else:
                     self.score += 20
+            elif apple.type == AppleTypes.SPECIAL:
+                SOUNDS['Special'].play()
+                self.addPiece(5)
+                self.score += 100
             return True
         return False
 
@@ -135,16 +190,14 @@ class Snake:
 
 class Game:
 
-    clock = pygame.time.Clock()
-
     def __init__(self, players, fps, controls):
         self.fps = fps
         self.controls = controls
-        self.apple = Apple(CELL_COUNT_X / 2, CELL_COUNT_Y / 2, AppleTypes.NORMAL)
         self.snakes = []
         self.snakes.append(Snake(random.randint(0, CELL_COUNT_X / 2), random.randint(0, CELL_COUNT_Y / 2), 15, 3, BLUE))
         if players == 2:
             self.snakes.append(Snake(random.randint(CELL_COUNT_X / 2, CELL_COUNT_X - 1), random.randint(CELL_COUNT_Y / 2, CELL_COUNT_Y - 1), 15, 3, GREEN))
+        self.apple = Apple(self.snakes)
 
     def restart(self):
         return Game(len(self.snakes), self.fps, self.controls)
@@ -156,6 +209,8 @@ class Game:
             self.apple.expiration -= 1
         for snake in self.snakes:
             snake.updatePosition()
+            if self.apple.type == AppleTypes.SPECIAL:
+                self.apple.move()
             if snake.hitSnake(snake) or snake.hitBorder():
                 SOUNDS['Hit'].play()
                 android.vibrate(0.2)
@@ -165,23 +220,23 @@ class Game:
             if snake.eatApple(self.apple):
                 if not self.apple.type == AppleTypes.NORMAL:
                     snake.changeColor(APPLE_COLORS[self.apple.type])
-                self.apple = Apple(random.randint(0, CELL_COUNT_X - 1 ), random.randint(0, CELL_COUNT_Y - 1), random.choice([0, 0, 0, 0, 0, 0, 0, 0, 1, 2]))
+                self.apple = Apple(self.snakes)
         return True
 
     def drawSnakes(self, surface, cell_size):
         for snake in self.snakes:
             snake.draw(surface, cell_size)
         self.apple.draw(surface, cell_size)
-        self.clock.tick(self.fps)
 
 class Page(object):
 
-    def __init__(self, width, height):
-        self.surface = pygame.Surface((width, height))
+    def __init__(self, width, height, surface):
+        self.surface = surface
+        self.surface.fill(BLACK)
         self.buttons = {}
 
     def update(self):
-        self.surface.fill(BLACK)
+        return
 
     def getButton(self, x, y):
         for button, rect in self.buttons.items():
@@ -198,13 +253,8 @@ class Page(object):
 
 class Menu(Page):
 
-    def __init__(self, width, height):
-        super(Menu, self).__init__(width, height)
-
-    def update(self):
-        super(Menu, self).update()
-        width = self.surface.get_width()
-        height = self.surface.get_height()
+    def __init__(self, width, height, surface):
+        super(Menu, self).__init__(width, height, surface)
         self.display_text('Python', height / 4, BLUE, (2 * width / 7 + width / 64, 2 * height / 5))
         self.display_text('VS', height / 7, RED, (width / 2, 2 * height / 5 - height / 50))
         self.display_text('Android', height / 4, GREEN, (5 * width / 7, 2 * height / 5))
@@ -215,46 +265,56 @@ class Menu(Page):
 
 class Leaderboard(Page):
 
-    def __init__(self, width, height):
-        super(Leaderboard, self).__init__(width, height)
+    def __init__(self, width, height, surface):
+        super(Leaderboard, self).__init__(width, height, surface)
+        self.display_text('Leaderboard:', height / 6, YELLOW, (width / 2, 2 * height / 7))
+        difficulty = ['Easy', 'Normal', 'Hard']
+        for i in range (1, 4):
+            self.display_text(str(i) + '.', height / 10, BLUE, (width / 12, height / 2 + (i + 1) * height / 10))
+            self.display_text(difficulty[i - 1], height / 8, RED, (i * width / 4, height / 2))
         self.scores = {
                 DIFFICULTY['Easy']: [],
                 DIFFICULTY['Normal']: [],
                 DIFFICULTY['Hard']: []
                 }
+        self.buttons['Menu'] = self.display_text('Back', height / 12, WHITE, (width / 16, 5 * height / 36))
 
     def update(self):
-        self.display_text('Leaderboard:', height / 6, YELLOW, (width / 2, 2 * height / 7))
-        difficulty = ['Easy', 'Normal', 'Hard']
-        for i in range (1, 4):
-            self.display_text(str(i) + '.', height / 10, BLUE, (width / 12, height / 2 + (i + 1) * height / 10))
-        for j in range(0, len(self.scores.keys())):
-            key = list(self.scores.keys())[j]
-            self.display_text(difficulty[j], height / 8, RED, ((j + 1) * width / 4, height / 2))
-            score = self.scores[key]
-            for i in range(0, min(len(score), 3)):
-                self.display_text(str(score[i]), height / 10, WHITE, ((j + 1) * width / 4, height / 2 + (i + 2) * height / 10))
+        super(Leaderboard, self).update()
+        width = self.surface.get_width()
+        height = self.surface.get_height()
+        score = self.scores[DIFFICULTY['Easy']]
+        for i in range(0, min(len(score), 3)):
+            self.display_text(str(score[i]), height / 10, WHITE, (width / 4, height / 2 + (i + 2) * height / 10))
+        score = self.scores[DIFFICULTY['Normal']]
+        for i in range(0, min(len(score), 3)):
+            self.display_text(str(score[i]), height / 10, WHITE, (width / 2, height / 2 + (i + 2) * height / 10))
+        score = self.scores[DIFFICULTY['Hard']]
+        for i in range(0, min(len(score), 3)):
+            self.display_text(str(score[i]), height / 10, WHITE, (3 * width / 4, height / 2 + (i + 2) * height / 10))
 
 class Settings(Page):
 
-    def __init__(self, width, height):
-        super(Settings, self).__init__(width, height)
+    def __init__(self, width, height, surface):
+        super(Settings, self).__init__(width, height, surface)
+        self.display_text('Difficulty:', height / 7, WHITE, (width / 3, 2 * height / 6))
+        self.display_text('Controls:', height / 7, WHITE, (width / 3 - width / 70, 7 * height / 12))
+        self.display_text('Audio:', height / 7, WHITE, (width / 3 - width / 20, 5 * height / 6))
+        self.buttons['Menu'] = self.display_text('Back', height / 12, WHITE, (width / 16, 5 * height / 36))
         self.difficulty = 1
         self.controls = 0
         self.sound = True
         self.music = True
         self.loadSettings()
+        pygame.mixer.music.set_volume(1 if self.music else 0)
 
     def update(self):
         super(Settings, self).update()
         width = self.surface.get_width()
         height = self.surface.get_height()
-        self.display_text('Difficulty:', height / 7, WHITE, (width / 3, 2 * height / 6))
         key = list(DIFFICULTY.keys())[self.difficulty]
-        self.buttons['Difficulty'] = self.display_text(key, height / 7, RED, (7 * width / 10, 2 * height / 6))
-        self.display_text('Controls:', height / 7, WHITE, (width / 3 - width / 70, 7 * height / 12))
-        self.buttons['Controls'] = self.display_text(CONTROLS[self.controls], height / 7, RED, (7 * width / 10, 7 * height / 12))
-        self.display_text('Audio:', height / 7, WHITE, (width / 3 - width / 20, 5 * height / 6))
+        self.buttons['Difficulty'] = self.display_text('   ' + key + '   ', height / 7, RED, (7 * width / 10, 2 * height / 6), BLACK)
+        self.buttons['Controls'] = self.display_text('   ' + CONTROLS[self.controls] + '   ', height / 7, RED, (7 * width / 10, 7 * height / 12), BLACK)
         self.buttons['Music'] = self.display_text(' Music ', height / 9, WHITE if self.music else RED, (4 * width / 5, 5 * height / 6 - height / 50), RED if self.music else BLACK)
         self.buttons['Sound'] = self.display_text(' Sound ', height / 9, WHITE if self.sound else RED, (3 * width / 5, 5 * height / 6 - height / 50), RED if self.sound else BLACK)
 
@@ -283,18 +343,19 @@ class Settings(Page):
 
 class GameField(Page):
 
-    def __init__(self, width, height, cell_size):
-        super(GameField, self).__init__(width, height)
+    def __init__(self, width, height, cell_size, surface):
+        super(GameField, self).__init__(width, height, surface)
         self.cell_size = cell_size
         self.game = None
 
     def update(self):
         super(GameField, self).update()
+        self.surface.fill(BLACK)
         width = self.surface.get_width()
         height = self.surface.get_height()
         if not self.game == None:
-            rect = self.display_text('Python: ' + str(self.game.snakes[0].score), height / 10, BLUE, (width / 8, height / 7))
-            self.display_text('x' + str(self.game.snakes[0].lives), height / 16, BLUE, (rect.right + width / 30, height / 7 - height / 100))
+            rect = self.display_text('Python: ' + str(self.game.snakes[0].score), height / 10, BLUE, (width / 8, height / 7), BLACK)
+            self.display_text('x' + str(self.game.snakes[0].lives), height / 16, BLUE, (rect.right + width / 30, height / 7 - height / 100), BLACK)
             # if len(self.game.snakes) == 2:
                 # rect = self.display_text('Viper: ' + str(self.game.snakes[1].score), height / 10, GREEN, (width / 1.13, height / 7))
                 # self.display_text('x' + str(self.game.snakes[1].lives), height / 16, GREEN, (rect.left - width / 40, height / 7 - height / 100))
@@ -360,43 +421,31 @@ class GameField(Page):
 
 class Pause(Page):
 
-    def __init__(self, width, height):
-        super(Pause, self).__init__(width, height)
-        self.game_surface = pygame.Surface((width, height))
-
-    def update(self):
-        super(Pause, self).update()
+    def __init__(self, width, height, surface, game_surface):
+        super(Pause, self).__init__(width, height, surface)
         self.surface.fill(WHITE)
+        self.game_surface = game_surface
         self.game_surface.set_alpha(220)
         self.surface.blit(self.game_surface, (0, 0))
-        width = self.surface.get_width()
-        height = self.surface.get_height()
         self.display_text('Paused', height / 4, YELLOW, (width / 2, height / 2))
-        self.buttons['Unpause'] = self.display_text('Resume', height / 8, GREEN, (width / 2, 3 * height / 4))
+        self.buttons['Menu'] = self.display_text('Back to Menu', height / 8, RED, (5 * width / 16, 3 * height / 4))
+        self.buttons['Unpause'] = self.display_text('Resume', height / 8, GREEN, (11 * width / 16, 3 * height / 4))
 
 class NotImplementedPage(Page):
 
-    def __init__(self, width, height):
-        super(NotImplementedPage, self).__init__(width, height)
-
-    def update(self):
-        super(NotImplementedPage, self).update()
-        self.display_text('Feature not yet implemented', height / 8, RED, (width / 2, height / 2))
-        self.buttons['Menu'] = self.display_text('Go back', height / 8, WHITE, (width / 2, 2 * height / 3))
+    def __init__(self, width, height, surface):
+        super(NotImplementedPage, self).__init__(width, height, surface)
+        self.display_text('Feature not yet implemented', height / 8, RED, (width / 2, 4 * height / 7))
+        self.buttons['Menu'] = self.display_text('Back', height / 12, WHITE, (width / 16, 5 * height / 36))
 
 class GameOver(Page):
 
-    def __init__(self, width, height):
-        super(GameOver, self).__init__(width, height)
-        self.game = None
-        self.scores = None
-
-    def update(self):
-        super(GameOver, self).update()
-        width = self.surface.get_width()
-        height = self.surface.get_height()
+    def __init__(self, width, height, game, scores, surface):
+        super(GameOver, self).__init__(width, height, surface)
+        self.game = game
+        self.scores = scores
+        self.display_text('Game Over!', height / 4, RED, (width / 2, 2 * height / 6))
         if not self.game == None:
-            self.display_text('Game Over!', height / 4, RED, (width / 2, 2 * height / 6))
             if len(self.game.snakes) == 1:
                 self.display_text('Score: ' + str(self.game.snakes[0].score), height / 8, GREEN, (width / 2, height / 2))
                 self.display_text('Leaderboard:', height / 10, WHITE, (width / 2, 4 * height / 7 + height / 10))
@@ -404,7 +453,6 @@ class GameOver(Page):
                 self.scores = list(set(self.scores))
                 self.scores.sort(reverse=True)
                 for i in range(0, min(len(self.scores), 3)):
-                    pass
                     self.display_text(str(i + 1) + '. ', height / 15, GREEN if self.scores[i] == self.game.snakes[0].score else WHITE, (3 * width / 7, 4 * height / 7 + (i + 2) * height / 11))
                     self.display_text(str(self.scores[i]), height / 15, GREEN if self.scores[i] == self.game.snakes[0].score else WHITE, (4 * width / 7, 4 * height / 7 + (i + 2) * height / 11))
             else:
@@ -435,26 +483,19 @@ class GameOver(Page):
             self.buttons['Menu'] = self.display_text('Return', height / 10, WHITE, (width / 7, 17 * height / 18))
             self.buttons['Restart'] = self.display_text('Restart', height / 10, WHITE, (6 * width / 7, 17 * height / 18))
 
-
 class UserInterface:
 
+    clock = pygame.time.Clock()
+
     def __init__(self, width, height, cell_size):
-        self.screen = pygame.display.set_mode((width, height), pygame.FULLSCREEN | pygame.HWSURFACE | pygame.DOUBLEBUF)
+        self.screen = pygame.display.set_mode((width, height), pygame.HWSURFACE)
         self.game = None
         self.pages = {}
-        self.pages['Menu'] = Menu(width, height)
-        self.pages['NotImplemented'] = NotImplementedPage(width, height)
-        self.pages['Settings'] = Settings(width, height)
-        self.pages['Leaderboard'] = Leaderboard(width, height)
-        self.pages['Leaderboard'].scores[DIFFICULTY['Easy']] = self.readLeaderboard(DIFFICULTY['Easy'])
-        self.pages['Leaderboard'].scores[DIFFICULTY['Normal']] = self.readLeaderboard(DIFFICULTY['Normal'])
-        self.pages['Leaderboard'].scores[DIFFICULTY['Hard']] = self.readLeaderboard(DIFFICULTY['Hard'])
-        self.pages['Game'] = GameField(width, height, cell_size)
-        self.pages['Pause'] = Pause(width, height)
-        self.pages['GameOver'] = GameOver(width, height)
-        for page in self.pages:
-            self.pages[page].update()
+        self.pages['Settings'] = Settings(width, height, self.screen)
+        self.pages['Menu'] = Menu(width, height, self.screen)
         self.current_page = None
+        self.update_flag = True
+        self.state = None
 
     def fadeBetweenSurfaces(self, surface):
         for i in range(0, 255, ANIMATION_SPEED):
@@ -463,54 +504,41 @@ class UserInterface:
             pygame.display.flip()
 
     def changePage(self, page):
-        if page == 'GameOver' and len(self.game.snakes) == 1:
-            self.pages[page].scores = self.readLeaderboard(self.game.fps)
-        elif self.current_page == 'GameOver' and len(self.game.snakes) == 1:
+        if self.current_page == 'GameOver' and len(self.game.snakes) == 1:
             self.saveLeaderboard(self.pages[self.current_page].scores, self.game.fps)
-            self.pages['Leaderboard'].scores[self.game.fps] = self.readLeaderboard(self.game.fps)
+        elif self.current_page == 'Settings':
+            self.pages[self.current_page].saveSettings()
         self.playMusic(page)
         self.current_page = page
-        self.pages[self.current_page].update()
-        self.fadeBetweenSurfaces(self.pages[self.current_page].surface)
+        self.update()
 
-    def handle(self):
+    def handleGame(self):
+        self.clock.tick(self.game.fps)
+        python_flag = False
         for event in pygame.event.get():
             if event.type == QUIT:
                 return False
             elif event.type == APP_TERMINATING:
                 return False
             elif event.type == APP_WILLENTERBACKGROUND:
-                return False
+                self.pages['Pause'] = Pause(width, height, self.screen, self.screen.copy())
+                self.changePage('Pause')
+                self.state = self.screen.copy()
+                return True
             elif event.type == KEYDOWN:
                 if event.key == pygame_sdl2.K_AC_BACK:
-                    if self.current_page == 'Game':
-                        pressed = 'Pause'
-                    elif self.current_page == 'Menu':
-                        return False
-                    else:
-                        pressed = 'Menu'
+                    pressed = 'Pause'
             elif event.type == FINGERDOWN:
                 pressed = self.pages[self.current_page].getButton(event.x, event.y)
             else:
                 continue
-            if pressed == 'Single':
-                self.game = Game(1, list(DIFFICULTY.values())[self.pages['Settings'].difficulty], self.pages['Settings'].controls)
-                self.pages['Game'].game = self.game
-                self.pages['GameOver'].game = self.game
-                self.changePage('Game')
-            elif pressed == 'Multi':
-                # self.game = Game(2, EASY if self.pages['Settings'].easy else HARD)
-                # self.pages['Game'].game = self.game
-                # self.pages['GameOver'].game = self.game
-                # self.changePage('Game')
-                self.changePage('NotImplemented')
-            # elif pressed == 'Left':
-                # direction = (self.game.snakes[0].direction - 1) % 4
-                # self.game.snakes[0].changeDirection(direction)
-            # elif pressed == 'Right':
-                # direction = (self.game.snakes[0].direction + 1) % 4
-                # self.game.snakes[0].changeDirection(direction)
-            elif pressed == 'Move':
+            if pressed == 'Menu':
+                self.pages['Confirm'] = Confirm(width, height, self.screen, self.screen.copy())
+                self.changePage('Confirm')
+            elif pressed == 'Pause':
+                self.pages['Pause'] = Pause(width, height, self.screen, self.screen.copy())
+                self.changePage('Pause')
+            elif pressed == 'Move' and not python_flag:
                 x = event.x * CELL_COUNT_X
                 y = event.y * CELL_COUNT_Y
                 if self.game.snakes[0].direction % 2 == 0:
@@ -523,77 +551,127 @@ class UserInterface:
                         self.game.snakes[0].changeDirection(0)
                     else:
                         self.game.snakes[0].changeDirection(2)
-                break
-            elif pressed == 'Up':
-                self.game.snakes[0].changeDirection(3)
-                break
-            elif pressed == 'Down':
-                self.game.snakes[0].changeDirection(1)
-                break
-            elif pressed == 'Left':
-                self.game.snakes[0].changeDirection(2)
-                break
-            elif pressed == 'Right':
-                self.game.snakes[0].changeDirection(0)
-                break
-            elif pressed == 'Settings':
-                self.changePage('Settings')
-            elif pressed == 'Leaderboard':
-                self.changePage('Leaderboard')
-            elif pressed == 'Difficulty':
-                self.pages['Settings'].difficulty = (self.pages['Settings'].difficulty + 1) % 3
-            elif pressed == 'Controls':
-                self.pages['Settings'].controls = (self.pages['Settings'].controls + 1) % 3
-            elif pressed == 'Sound':
-                self.pages['Settings'].sound = not self.pages['Settings'].sound
-                for sound in SOUNDS.values():
-                    sound.set_volume(1 if self.pages['Settings'].sound else 0)
-            elif pressed == 'Music':
-                self.pages['Settings'].music = not self.pages['Settings'].music
-                mixer.music.set_volume(1 if self.pages['Settings'].music else 0)
-            elif pressed == 'Menu':
-                    self.changePage('Menu')
-            elif pressed == 'Pause':
-                self.pages['Pause'].game_surface = self.pages['Game'].surface
-                self.changePage('Pause')
-            elif pressed == 'Unpause':
-                self.changePage('Game')
-            elif pressed == 'Yes':
-                self.changePage('Menu')
-            elif pressed == 'No':
-                self.changePage('Game')
-            elif pressed == 'Restart':
-                self.game = self.game.restart()
-                self.pages['Game'].game = self.game
-                self.pages['GameOver'].game = self.game
-                self.changePage('Game')
-            elif pressed == 'Quit':
+                python_flag = True
+            elif pressed == 'Up' and not python_flag:
+                if self.game.snakes[0].changeDirection(3):
+                    python_flag = True
+            elif pressed == 'Down' and not python_flag:
+                if self.game.snakes[0].changeDirection(1):
+                    python_flag = True
+            elif pressed == 'Left' and not python_flag:
+                if self.game.snakes[0].changeDirection(2):
+                    python_flag = True
+            elif pressed == 'Right' and not python_flag:
+                if self.game.snakes[0].changeDirection(0):
+                    python_flag = True
+            else:
+                continue
+        if not self.game.updateSnakes():
+            self.pages['GameOver'] = GameOver(self.screen.get_width(), self.screen.get_height(), self.game, self.loadLeaderboard(self.game.fps), self.screen)
+            self.changePage('GameOver')
+        return True
+
+    def handle(self):
+        while True:
+            event = pygame.event.wait()
+            if event.type == QUIT:
                 return False
-        if self.current_page == 'Game':
-            if not self.game.updateSnakes():
-                self.changePage('GameOver')
+            elif event.type == APP_TERMINATING:
+                return False
+            elif event.type == APP_WILLENTERBACKGROUND:
+                self.state = self.screen.copy()
+                return True
+            elif event.type == APP_DIDENTERFOREGROUND:
+                self.screen = pygame.display.set_mode((width, height), pygame.HWSURFACE)
+                self.pages['Game'] = GameField(width, height, cell_size, self.screen)
+                self.pages['Game'].game = self.game
+                self.screen.blit(self.state, (0, 0))
+                pygame.display.flip()
+                return True
+            elif event.type == KEYDOWN:
+                if event.key == pygame_sdl2.K_AC_BACK:
+                    if self.current_page == 'Menu':
+                        return False
+                    else:
+                        pressed = 'Menu'
+                    break
+            elif event.type == FINGERDOWN:
+                pressed = self.pages[self.current_page].getButton(event.x, event.y)
+                break
+            else:
+                continue
+        if pressed == 'Single':
+            self.game = Game(1, list(DIFFICULTY.values())[self.pages['Settings'].difficulty], self.pages['Settings'].controls)
+            self.pages['Game'] = GameField(width, height, cell_size, self.screen)
+            self.pages['Game'].game = self.game
+            self.changePage('Game')
+        elif pressed == 'Multi':
+            # self.game = Game(2, EASY if self.pages['Settings'].easy else HARD)
+            # self.pages['Game'].game = self.game
+            # self.pages['GameOver'].game = self.game
+            # self.changePage('Game')
+            self.pages['NotImplemented'] = NotImplementedPage(width, height, self.screen)
+            self.changePage('NotImplemented')
+        elif pressed == 'Settings':
+            self.pages['Settings'] = Settings(width, height, self.screen)
+            self.changePage('Settings')
+        elif pressed == 'Leaderboard':
+            self.pages['Leaderboard'] = Leaderboard(width, height, self.screen)
+            self.pages['Leaderboard'].scores[DIFFICULTY['Easy']] = self.loadLeaderboard(DIFFICULTY['Easy'])
+            self.pages['Leaderboard'].scores[DIFFICULTY['Normal']] = self.loadLeaderboard(DIFFICULTY['Normal'])
+            self.pages['Leaderboard'].scores[DIFFICULTY['Hard']] = self.loadLeaderboard(DIFFICULTY['Hard'])
+            self.changePage('Leaderboard')
+        elif pressed == 'Difficulty':
+            self.pages['Settings'].difficulty = (self.pages['Settings'].difficulty + 1) % 3
+        elif pressed == 'Controls':
+            self.pages['Settings'].controls = (self.pages['Settings'].controls + 1) % 3
+        elif pressed == 'Sound':
+            self.pages['Settings'].sound = not self.pages['Settings'].sound
+            for sound in SOUNDS.values():
+                sound.set_volume(1 if self.pages['Settings'].sound else 0)
+        elif pressed == 'Music':
+            self.pages['Settings'].music = not self.pages['Settings'].music
+            pygame.mixer.music.set_volume(1 if self.pages['Settings'].music else 0)
+        elif pressed == 'Menu':
+            self.pages['Menu'] = Menu(width, height, self.screen)
+            self.changePage('Menu')
+        elif pressed == 'Unpause':
+            self.changePage('Game')
+        elif pressed == 'Yes':
+            self.pages['Menu'] = Menu(width, height, self.screen)
+            self.changePage('Menu')
+        elif pressed == 'No':
+            self.changePage('Game')
+        elif pressed == 'Restart':
+            self.game = self.game.restart()
+            self.pages['Game'] = GameField(width, height, cell_size, self.screen)
+            self.pages['Game'].game = self.game
+            self.changePage('Game')
+        elif pressed == 'Quit':
+            return False
+        else:
+            self.update_flag = False
         return True
 
     def update(self):
         self.pages[self.current_page].update()
-        self.screen.blit(self.pages[self.current_page].surface, (0, 0))
         pygame.display.flip()
 
     def playMusic(self, page):
         if not self.current_page == 'Settings' and not self.current_page == 'NotImplemented' and not self.current_page == 'Leaderboard':
             if page == 'Game':
                 if self.current_page == 'Pause':
-                    mixer.music.unpause()
+                    pygame.mixer.music.unpause()
                 else:
-                    mixer.music.load(MUSIC[self.game.fps])
-                    mixer.music.play(loops=-1)
+                    pygame.mixer.music.load(MUSIC[self.game.fps])
+                    pygame.mixer.music.play(loops=-1)
             elif page == 'Pause':
-                mixer.music.pause()
+                pygame.mixer.music.pause()
             elif not page == 'Settings' and not page == 'NotImplemented' and not page == 'Leaderboard':
-                mixer.music.load(MUSIC[page])
-                mixer.music.play(loops=-1)
+                pygame.mixer.music.load(MUSIC[page])
+                pygame.mixer.music.play(loops=-1)
 
-    def readLeaderboard(self, difficulty):
+    def loadLeaderboard(self, difficulty):
         scores = []
         try:
             if difficulty == DIFFICULTY['Easy']:
@@ -623,11 +701,10 @@ class UserInterface:
 # Init
 pygame.init()
 pygame.display.set_caption('Python vs Android')
-
 # Colors
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
-GREY = (255, 255, 255, 60)
+GREY = (255, 255, 255, 80)
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)
 BLUE = (0, 0, 255)
@@ -637,13 +714,14 @@ MAGENTA = (255, 0, 255)
 APPLE_COLORS = {
         AppleTypes.NORMAL : RED,
         AppleTypes.GOLDEN : YELLOW,
-        AppleTypes.LIFE : MAGENTA
+        AppleTypes.LIFE : MAGENTA,
+        AppleTypes.SPECIAL : CYAN
         }
 # FPS
 DIFFICULTY = {
-        'Easy' : 25,
-        'Normal' : 40,
-        'Hard': 80
+        'Easy' : 15,
+        'Normal' : 25,
+        'Hard': 35
         }
 # Controls
 CONTROLS = ['Touch', 'Buttons', 'Inverted']
@@ -651,7 +729,7 @@ CONTROLS = ['Touch', 'Buttons', 'Inverted']
 MUSIC = {
         'Menu' : 'resources/intro.wav',
         DIFFICULTY['Easy'] : 'resources/easy.wav',
-        DIFFICULTY['Normal'] : 'resources/hard.wav',
+        DIFFICULTY['Normal'] : 'resources/normal.wav',
         DIFFICULTY['Hard'] : 'resources/hard.wav',
         'Pause' : None,
         'Confirm' : None,
@@ -659,16 +737,17 @@ MUSIC = {
         }
 # Sounds
 SOUNDS = {
-        'Apple' : mixer.Sound('resources/apple.wav'),
-        'Golden' : mixer.Sound('resources/golden.wav'),
-        'Life' : mixer.Sound('resources/life.wav'),
-        'Hit' : mixer.Sound('resources/hit.wav'),
+        'Apple' : pygame.mixer.Sound('resources/apple.wav'),
+        'Golden' : pygame.mixer.Sound('resources/golden.wav'),
+        'Life' : pygame.mixer.Sound('resources/life.wav'),
+        'Special' : pygame.mixer.Sound('resources/special.wav'),
+        'Hit' : pygame.mixer.Sound('resources/hit.wav'),
         }
 # Utils
 ANIMATION_SPEED = 20
 APPLE_EXPIRATION = 120
 SNAKE_EXPIRATION = 40
-
+SPECIAL_FRAMES = 3
 # Adapt size to screen
 width = pygame.display.Info().current_w
 height = pygame.display.Info().current_h
@@ -679,11 +758,18 @@ CELL_COUNT_X = int(width / cell_size)
 ui = UserInterface(width, height, cell_size)
 ui.changePage('Menu')
 
+running = True
+
 # Loop
-while ui.handle():
-    ui.update()
-    # if android.check_pause():
-        # android.wait_for_resume()
+while running:
+    if ui.current_page == 'Game':
+        running = ui.handleGame()
+    else:
+        running = ui.handle()
+    if ui.update_flag:
+        ui.update()
+    else:
+        ui.update_flag = True
 else:
     ui.pages['Settings'].saveSettings()
 
