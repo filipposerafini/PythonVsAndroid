@@ -207,10 +207,10 @@ class Game:
             self.apple.type = AppleTypes.NORMAL
         else:
             self.apple.expiration -= 1
+        if self.apple.type == AppleTypes.SPECIAL:
+            self.apple.move()
         for snake in self.snakes:
             snake.updatePosition()
-            if self.apple.type == AppleTypes.SPECIAL:
-                self.apple.move()
             if snake.hitSnake(snake) or snake.hitBorder():
                 SOUNDS['Hit'].play()
                 android.vibrate(0.2)
@@ -361,13 +361,17 @@ class GameField(Page):
                 # self.display_text('x' + str(self.game.snakes[1].lives), height / 16, GREEN, (rect.left - width / 40, height / 7 - height / 100))
             self.game.drawSnakes(self.surface, self.cell_size)
             if self.game.controls == CONTROLS.index('Touch'):
-                self.buttons['Move'] = Rect(0, 0, width, height)
-                self.buttons['Up'] = Rect(0, 0, 0, 0)
-                self.buttons['Down'] = Rect(0, 0, 0, 0)
-                self.buttons['Left'] = Rect(0, 0, 0, 0)
-                self.buttons['Right'] = Rect(0, 0, 0, 0)
-            if self.game.controls == CONTROLS.index('Buttons'):
-                self.buttons['Move'] = Rect(0, 0, 0, 0)
+                if self.game.snakes[0].direction % 2 == 0:
+                    self.buttons['Up'] = Rect(0, 0, width, height / 2)
+                    self.buttons['Down'] = Rect(0, height / 2, width, height / 2)
+                    self.buttons['Left'] = Rect(0, 0, 0, 0)
+                    self.buttons['Right'] = Rect(0, 0, 0, 0)
+                else:
+                    self.buttons['Left'] = Rect(0, 0, width / 2, height)
+                    self.buttons['Right'] = Rect(width / 2, 0, width / 2, height)
+                    self.buttons['Up'] = Rect(0, 0, 0, 0)
+                    self.buttons['Down'] = Rect(0, 0, 0, 0)
+            elif self.game.controls == CONTROLS.index('Buttons'):
                 pointlist = [
                         (width / 5 - height / 14, 5 * height / 7 - height / 28),
                         (width / 5, 4 * height / 7 - height / 28),
@@ -392,8 +396,7 @@ class GameField(Page):
                         (4 * width / 5 + height / 28, 5 * height / 7 - height / 14)
                         ]
                 self.buttons['Right'] = pygame.draw.polygon(self.surface, GREY, pointlist)
-            if self.game.controls == CONTROLS.index('Inverted'):
-                self.buttons['Move'] = Rect(0, 0, 0, 0)
+            elif self.game.controls == CONTROLS.index('Inverted'):
                 pointlist = [
                         (4 * width / 5 - height / 14, 5 * height / 7 - height / 28),
                         (4 * width / 5, 4 * height / 7 - height / 28),
@@ -538,20 +541,6 @@ class UserInterface:
             elif pressed == 'Pause':
                 self.pages['Pause'] = Pause(width, height, self.screen, self.screen.copy())
                 self.changePage('Pause')
-            elif pressed == 'Move' and not python_flag:
-                x = event.x * CELL_COUNT_X
-                y = event.y * CELL_COUNT_Y
-                if self.game.snakes[0].direction % 2 == 0:
-                    if y > self.game.snakes[0].y[0]:
-                        self.game.snakes[0].changeDirection(1)
-                    else:
-                        self.game.snakes[0].changeDirection(3)
-                else:
-                    if x > self.game.snakes[0].x[0]:
-                        self.game.snakes[0].changeDirection(0)
-                    else:
-                        self.game.snakes[0].changeDirection(2)
-                python_flag = True
             elif pressed == 'Up' and not python_flag:
                 if self.game.snakes[0].changeDirection(3):
                     python_flag = True
@@ -624,7 +613,7 @@ class UserInterface:
         elif pressed == 'Difficulty':
             self.pages['Settings'].difficulty = (self.pages['Settings'].difficulty + 1) % 3
         elif pressed == 'Controls':
-            self.pages['Settings'].controls = (self.pages['Settings'].controls + 1) % 3
+            self.pages['Settings'].controls = (self.pages['Settings'].controls + 1) % len(CONTROLS)
         elif pressed == 'Sound':
             self.pages['Settings'].sound = not self.pages['Settings'].sound
             for sound in SOUNDS.values():
@@ -724,7 +713,7 @@ DIFFICULTY = {
         'Hard': 35
         }
 # Controls
-CONTROLS = ['Touch', 'Buttons', 'Inverted']
+CONTROLS = ['Touch', 'Buttons', 'Inverted', 'D-Pad']
 # Music
 MUSIC = {
         'Menu' : 'resources/intro.wav',
