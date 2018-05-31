@@ -713,7 +713,7 @@ DIFFICULTY = {
         'Hard': 35
         }
 # Controls
-CONTROLS = ['Touch', 'Buttons', 'Inverted', 'D-Pad']
+CONTROLS = ['Touch', 'Buttons', 'Inverted']
 # Music
 MUSIC = {
         'Menu' : 'resources/intro.wav',

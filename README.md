@@ -1,4 +1,4 @@
-# Python VS Android ![Python][python] ![Release][release] ![License][license]
+# Python VS Android ![Python][python] ![Release][release] [![License](https://img.shields.io/badge/License-MIT-red.svg?longCache=true&style=flat-square)](LICENSE)
 
 Porting on Android of the game [**Python VS Viper**](https://github.com/filipposerafini/PythonVsViper), made using [**RAPT**](https://github.com/renpy/rapt).
 
@@ -13,5 +13,4 @@ Distributed under the [MIT](LICENSE) license.
 Copyright &copy; 2018, [Filippo Serafini](https://filipposerafini.github.io/)
 
 [python]: https://img.shields.io/badge/python-2.7-blue.svg?longCache=true&style=flat-square
-[release]: https://img.shields.io/badge/Release-1.0-brightgreen.svg?longCache=true&style=flat-square
-[license]: https://img.shields.io/badge/License-MIT-red.svg?longCache=true&style=flat-square
+[release]: https://img.shields.io/badge/Release-1.1.1-brightgreen.svg?longCache=true&style=flat-square
